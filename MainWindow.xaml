@@ -1,0 +1,79 @@
+<Window x:Class="Sidebar.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Sidebar">
+ <Grid x:Name="Root" Padding="10,8,10,10" RowSpacing="8" Background="Transparent" RightTapped="Sidebar_RightTapped">
+  <Grid.Resources>
+   <Style x:Key="RailButton" TargetType="Button"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="6,8"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
+   <Style x:Key="GadgetTile" TargetType="Border"><Setter Property="Padding" Value="12"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
+  </Grid.Resources>
+  <Grid.RowDefinitions><RowDefinition Height="0"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0"><StackPanel x:Name="GadgetStack" Spacing="12">
+  <Border x:Name="ClockGadget" Padding="0,4,0,12" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" DoubleTapped="Clock_DoubleTapped"><StackPanel Spacing="4" HorizontalAlignment="Center">
+   <Viewbox x:Name="ClockView" Width="96" Height="96"><Canvas x:Name="ClockFace" Width="156" Height="156" AutomationProperties.Name="Analog clock"/></Viewbox>
+   <TextBlock x:Name="TimeText" FontSize="24" FontWeight="SemiLight" HorizontalAlignment="Center"/>
+   <TextBlock x:Name="DateText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="190"/>
+   <TextBlock x:Name="ClockCaption" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextWrapping="Wrap" MaxWidth="190"/>
+   <Button Click="CustomizeClock_Click" AutomationProperties.Name="Customize clock" ToolTipService.ToolTip="Customize clock" HorizontalAlignment="Center" Background="Transparent" BorderThickness="0" Padding="4"><FontIcon Glyph="&#xE713;" FontSize="12"/></Button>
+  </StackPanel></Border>
+
+   <Border x:Name="CalendarGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8">
+    <Grid RowSpacing="4"><Grid.RowDefinitions><RowDefinition/><RowDefinition/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+     <TextBlock x:Name="MonthText" Grid.ColumnSpan="4" VerticalAlignment="Center" FontWeight="SemiBold" TextWrapping="Wrap"/>
+     <Button Grid.Row="1" Grid.Column="1" Click="Today_Click" AutomationProperties.Name="Today" ToolTipService.ToolTip="Today" Width="28" MinWidth="28" Padding="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE787;" FontSize="12"/></Button>
+     <Button Grid.Row="1" Grid.Column="2" Click="PreviousMonth_Click" AutomationProperties.Name="Previous month" Width="28" MinWidth="28" Padding="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76B;" FontSize="12"/></Button>
+     <Button Grid.Row="1" Grid.Column="3" Click="NextMonth_Click" AutomationProperties.Name="Next month" Width="28" MinWidth="28" Padding="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76C;" FontSize="12"/></Button>
+    </Grid><Grid x:Name="CalendarGrid" RowSpacing="2"/>
+   </StackPanel></Border>
+   <Border x:Name="TimerCategory" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="Timer" FontWeight="SemiBold"/>
+    <TextBlock x:Name="TimerText" Text="05:00" FontSize="28" HorizontalAlignment="Center"/>
+    <NumberBox x:Name="TimerMinutes" Header="Minutes" Value="5" Minimum="1" Maximum="180" SpinButtonPlacementMode="Compact"/>
+    <StackPanel Orientation="Horizontal" Spacing="6"><Button x:Name="TimerStart" Content="Start" Click="Timer_Click"/><Button Content="Reset" Click="TimerReset_Click"/></StackPanel>
+   </StackPanel></Border>
+   <Border x:Name="StorageCategory" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="Storage" FontWeight="SemiBold"/><TextBlock x:Name="StorageText" TextWrapping="Wrap" FontSize="12"/><ProgressBar x:Name="StorageBar" Maximum="100" AutomationProperties.Name="System drive usage"/></StackPanel></Border>
+   <Border x:Name="NotesGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="Notes" FontWeight="SemiBold"/>
+    <TextBox x:Name="NotesBox" PlaceholderText="Write a note…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" MaxHeight="180" TextChanged="Notes_Changed" AutomationProperties.Name="Notes"/>
+    <TextBlock x:Name="SaveStatus" Text="Saved on this device" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+   </StackPanel></Border>
+   <Border x:Name="SystemGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="CPU meter" FontWeight="SemiBold"/>
+    <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+     <StackPanel Spacing="4"><Grid Height="62"><ProgressRing x:Name="CpuRing" IsIndeterminate="False" Width="62" Height="62" Maximum="100" AutomationProperties.Name="CPU usage"/><TextBlock x:Name="CpuPercent" Text="—" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="14"/></Grid><TextBlock Text="CPU" HorizontalAlignment="Center" FontSize="11"/></StackPanel>
+     <StackPanel Grid.Column="1" Spacing="4"><Grid Height="62"><ProgressRing x:Name="MemoryRing" IsIndeterminate="False" Width="62" Height="62" Maximum="100" AutomationProperties.Name="Memory usage"/><TextBlock x:Name="MemoryPercent" Text="—" VerticalAlignment="Center" HorizontalAlignment="Center" FontSize="14"/></Grid><TextBlock Text="Memory" HorizontalAlignment="Center" FontSize="11"/></StackPanel>
+    </Grid>
+    <TextBlock x:Name="CpuText" Visibility="Collapsed"/><ProgressBar x:Name="CpuBar" Maximum="100" Visibility="Collapsed"/>
+    <TextBlock x:Name="MemoryText" FontSize="11" TextWrapping="Wrap"/><ProgressBar x:Name="MemoryBar" Maximum="100" Visibility="Collapsed"/>
+   </StackPanel></Border>
+   <Border x:Name="SlideShowGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="Slide show" FontWeight="SemiBold"/>
+    <Grid Height="130" Background="{ThemeResource SubtleFillColorSecondaryBrush}"><Image x:Name="SlideImage" Stretch="UniformToFill"/><TextBlock x:Name="SlideHint" Text="Choose a picture folder" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12"/></Grid>
+    <TextBlock x:Name="SlideName" FontSize="11" TextTrimming="CharacterEllipsis"/>
+    <Grid ColumnSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
+     <Button Click="SlidePrevious_Click" AutomationProperties.Name="Previous picture" Padding="6"><FontIcon Glyph="&#xE76B;" FontSize="12"/></Button>
+     <Button Grid.Column="1" x:Name="SlidePlay" Click="SlidePlay_Click" Content="Pause" IsEnabled="False" FontSize="12" Padding="6,4"/>
+     <Button Grid.Column="2" Click="SlideNext_Click" AutomationProperties.Name="Next picture" Padding="6"><FontIcon Glyph="&#xE76C;" FontSize="12"/></Button>
+     <Button Grid.Column="3" Click="ChooseSlideFolder_Click" AutomationProperties.Name="Choose picture folder" ToolTipService.ToolTip="Choose picture folder" HorizontalAlignment="Right" Padding="6"><FontIcon Glyph="&#xE8B7;" FontSize="14"/></Button>
+    </Grid>
+   </StackPanel></Border>
+   <Border x:Name="PuzzleGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="Picture puzzle" FontWeight="SemiBold"/>
+    <Grid x:Name="PuzzleBoard" Height="174" RowSpacing="2" ColumnSpacing="2"/>
+    <TextBlock x:Name="PuzzleStatus" Text="Choose a picture or play with numbers" TextWrapping="Wrap" FontSize="11"/>
+    <StackPanel Orientation="Horizontal" Spacing="6"><Button Click="PuzzleShuffle_Click" Content="Shuffle" Padding="8,4"/><Button Click="ChoosePuzzlePicture_Click" Content="Picture" Padding="8,4"/></StackPanel>
+   </StackPanel></Border>
+   <Border x:Name="FeedsGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><Grid><TextBlock Text="Feed headlines" FontWeight="SemiBold"/><Button Click="ConfigureFeed_Click" Content="Edit" FontSize="11" HorizontalAlignment="Right" Margin="0,0,24,0" Padding="4" Background="Transparent" BorderThickness="0"/></Grid>
+    <TextBlock x:Name="FeedStatus" Text="Add an RSS or Atom feed" TextWrapping="Wrap" FontSize="11"/>
+    <StackPanel x:Name="FeedItems" Spacing="6"/>
+    <Button Click="RefreshFeed_Click" Content="Refresh" Padding="8,4" HorizontalAlignment="Left"/>
+   </StackPanel></Border>
+   <Border x:Name="LaunchCategory" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8">
+    <Grid><TextBlock Text="Quick launch" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Click="CustomizeLaunch_Click" Content="Edit" FontSize="11" HorizontalAlignment="Right" Margin="0,0,24,0" Padding="4" Background="Transparent" BorderThickness="0"/></Grid>
+    <StackPanel x:Name="LaunchItems" Spacing="4"/>
+   </StackPanel></Border>
+  </StackPanel></ScrollViewer>
+  <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
+   <Button x:Name="PreviousPage" Click="PreviousPage_Click" AutomationProperties.Name="Previous gadget page" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76B;" FontSize="12"/></Button>
+   <Button x:Name="NextPage" Click="NextPage_Click" AutomationProperties.Name="Next gadget page" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76C;" FontSize="12"/></Button>
+   <Button Click="Add_Click" AutomationProperties.Name="Add or customize gadgets" ToolTipService.ToolTip="Add gadgets" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE710;" FontSize="12"/></Button>
+   <TextBlock x:Name="PageIndicator" Visibility="Collapsed"/>
+  </StackPanel>
+  <TextBlock Grid.Row="4" x:Name="PanelStatus" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+ </Grid>
+</Window>
+
+
+
