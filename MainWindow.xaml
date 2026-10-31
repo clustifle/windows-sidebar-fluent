@@ -71,13 +71,16 @@
    <Button Click="Add_Click" AutomationProperties.Name="Add or customize gadgets" ToolTipService.ToolTip="Add gadgets" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE710;" FontSize="12"/></Button>
    <TextBlock x:Name="PageIndicator" Visibility="Collapsed"/>
   </StackPanel>
-  <StackPanel x:Name="LonghornPanel" Grid.Row="5" Visibility="Collapsed" Spacing="8">
-   <Grid ColumnSpacing="6"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Content="Start" Click="LonghornStart_Click" HorizontalAlignment="Stretch"/><Button Grid.Column="1" Content="Apps" Click="LonghornApps_Click"/></Grid>
-   <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="LonghornPins" RowSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer>
-   <ScrollViewer MaxHeight="112" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="RunningItems" RowSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer>
-   <ScrollViewer MaxHeight="76" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="ShellTrayItems" RowSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer>
-   <Grid x:Name="LonghornSystemButtons" ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid>
-   <Button Content="Restore Windows taskbar" Click="RestoreTaskbar_Click" FontSize="11" Padding="6,3" HorizontalAlignment="Stretch"/>
+  <StackPanel x:Name="LonghornPanel" Grid.Row="5" Visibility="Collapsed" Spacing="4">
+   <Border BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="0,5,0,0"><ScrollViewer MaxHeight="76" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="LonghornPins" AutomationProperties.Name="Pinned apps" RowSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer></Border>
+   <Border BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="0,4,0,0"><ScrollViewer MaxHeight="68" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="RunningItems" AutomationProperties.Name="Running windows" RowSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer></Border>
+   <Border BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="0,4,0,0"><ScrollViewer MaxHeight="50" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="ShellTrayItems" AutomationProperties.Name="Application tray" RowSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer></Border>
+   <Grid x:Name="LonghornSystemButtons" ColumnSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid>
+   <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="32"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
+    <Button Content="Start" Click="LonghornStart_Click" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}" CornerRadius="2" Padding="10,4"/>
+    <Button Grid.Column="1" Click="LonghornApps_Click" AutomationProperties.Name="All apps" ToolTipService.ToolTip="All apps" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE721;" FontSize="14"/></Button>
+    <Button Grid.Column="2" Click="RestoreTaskbar_Click" AutomationProperties.Name="Restore Windows taskbar" ToolTipService.ToolTip="Restore Windows taskbar" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE777;" FontSize="14"/></Button>
+   </Grid>
   </StackPanel>
   <TextBlock Grid.Row="4" x:Name="PanelStatus" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
  </Grid>

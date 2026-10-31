@@ -2,7 +2,13 @@ using System.Runtime.InteropServices;
 
 namespace Sidebar;
 
-internal sealed record InstalledApp(string Name, string Target);
+[Microsoft.UI.Xaml.Data.Bindable]
+public sealed class InstalledApp
+{
+    public string Name { get; set; }
+    public string Target { get; set; }
+    public InstalledApp(string name, string target) { Name = name; Target = target; }
+}
 
 internal static class InstalledApps
 {

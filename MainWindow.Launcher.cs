@@ -27,13 +27,14 @@ public partial class MainWindow
         grid.Children.Clear(); grid.RowDefinitions.Clear();
         foreach (var shortcut in state.Shortcuts)
         {
-            var row = new Grid { Width = 28, Height = 28 };
+            int iconSize = state.LonghornMode && grid == LonghornPins ? 24 : 28;
+            var row = new Grid { Width = iconSize, Height = iconSize };
             bool website = IsWebsite(shortcut.Target);
             var fallback = new FontIcon { Glyph = website ? "\uE774" : "\uE8A5", FontSize = 20 };
             row.Children.Add(fallback);
-            var image = new Image { Width = 28, Height = 28, Visibility = Visibility.Collapsed };
+            var image = new Image { Width = iconSize, Height = iconSize, Visibility = Visibility.Collapsed };
             row.Children.Add(image);
-            var button = new Button { Content = row, Width = 40, Height = 40, Padding = new Thickness(6), Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0) };
+            var button = new Button { Content = row, Width = iconSize + 12, Height = iconSize + 12, Padding = new Thickness(6), Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0) };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, shortcut.Name);
             ToolTipService.SetToolTip(button, shortcut.Name);
             button.Click += async (_, _) => await OpenShortcut(shortcut);
@@ -45,13 +46,15 @@ public partial class MainWindow
         }
         if (state.Shortcuts.Count == 0) grid.Children.Add(new TextBlock { Text = "Choose Edit to add apps or websites.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         }
-        Render(LaunchItems); Render(LonghornPins);
+        Render(LaunchItems);
+        if (state.LonghornMode) Render(LonghornPins); else { LonghornPins.Children.Clear(); LonghornPins.RowDefinitions.Clear(); }
     }
 
     private static bool IsWebsite(string target) => Uri.TryCreate(target, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https");
 
-    private async void LoadShortcutIcon(LaunchShortcut shortcut, Image image, FontIcon fallback)
+    private async void LoadShortcutIcon(LaunchShortcut shortcut, Image image, FontIcon fallback, bool persist = true)
     {
+        image.Tag = shortcut.Target;
         try
         {
             if (!shortcutImages.TryGetValue(shortcut.Target, out var bitmap))
@@ -63,7 +66,7 @@ public partial class MainWindow
                     try { shortcut.IconData = await iconTask; shortcut.IconVersion = 2; }
                     finally { loadingShortcutIcons.Remove(shortcut.Target); }
                     if (string.IsNullOrEmpty(shortcut.IconData)) return;
-                    Save();
+                    if (persist) Save();
                 }
                 using var stream = new InMemoryRandomAccessStream();
                 using (var writer = new DataWriter(stream.GetOutputStreamAt(0)))
@@ -72,6 +75,7 @@ public partial class MainWindow
                 bitmap = new BitmapImage(); await bitmap.SetSourceAsync(stream);
                 shortcutImages[shortcut.Target] = bitmap;
             }
+            if (image.Tag as string != shortcut.Target) return;
             image.Source = bitmap; image.Visibility = Visibility.Visible; fallback.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex) when (ex is FormatException or System.Runtime.InteropServices.COMException or System.IO.IOException) { }

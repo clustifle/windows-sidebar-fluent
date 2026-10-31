@@ -109,7 +109,7 @@ public partial class MainWindow
                 if (animate) { Animate(0, state.Left ? -48 : 48, 1, 0, 120); await Task.Delay(130); }
                 if (sidebarClosed) return;
                 state.Left = destination;
-                appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide);
+                appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide, taskbarReplacementActive);
                 if (animate) { Animate(state.Left ? -48 : 48, 0, 0, 1, 200); await Task.Delay(210); }
             }
         }

@@ -119,7 +119,7 @@ public partial class MainWindow : Window
         ApplyGadgetPage();
         ClockView.Width = ClockView.Height = state.CompactClock ? 80 : 120;
         ApplyClockPreferences();
-        appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide);
+        appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide, taskbarReplacementActive);
         ApplyAutoHidePreference();
         UpdateTimerInterval();
         if (ready) UpdateGadgets();
@@ -155,7 +155,8 @@ public partial class MainWindow : Window
         };
         if (SystemBackdrop is SidebarBackdrop railBackdrop) railBackdrop.SetTheme(requestedTheme);
         if (Root.RequestedTheme != requestedTheme) Root.RequestedTheme = requestedTheme;
-        Root.Background = SurfaceBrush(requestedTheme, 128);
+        Root.Background = RailSurfaceBrush(requestedTheme);
+        ApplyLonghornVisuals();
         if (preferencesWindow?.SystemBackdrop is SidebarBackdrop settingsBackdrop) settingsBackdrop.SetTheme(requestedTheme);
         if (preferencesWindow?.Content is FrameworkElement preferencesRoot)
         {
@@ -182,7 +183,7 @@ public partial class MainWindow : Window
 
     private void PositionSidebar()
     {
-        appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide);
+        appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide, taskbarReplacementActive);
         ApplyAutoHidePreference();
     }
 
@@ -352,7 +353,7 @@ public partial class MainWindow : Window
         int first = (int)culture.FirstDayOfWeek;
         int offset = ((int)month.DayOfWeek - first + 7) % 7;
         int rows = 1 + (offset + DateTime.DaysInMonth(month.Year, month.Month) + 6) / 7;
-        for (int i = 0; i < rows; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(28) });
+        for (int i = 0; i < rows; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(state.LonghornMode ? 26 : 28) });
         for (int i = 0; i < 7; i++) AddDay(culture.GetShortestDayName((DayOfWeek)((i + first) % 7)), 0, i, false);
         for (int day = 1; day <= DateTime.DaysInMonth(month.Year, month.Month); day++)
         {
@@ -364,7 +365,7 @@ public partial class MainWindow : Window
     private void AddDay(string text, int row, int column, bool today)
     {
         var label = new TextBlock { Text = text, FontSize = row == 0 ? 10 : 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        var border = new Border { Child = label, CornerRadius = new CornerRadius(14), MinWidth = 22, Height = 28 };
+        var border = new Border { Child = label, CornerRadius = new CornerRadius(14), MinWidth = 22, Height = state.LonghornMode ? 26 : 28 };
         if (row == 0) label.Opacity = 0.6;
         if (today) { label.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold; border.Background = CpuBar.Foreground; label.Foreground = new SolidColorBrush(Colors.White); }
         Grid.SetRow(border, row); Grid.SetColumn(border, column); CalendarGrid.Children.Add(border);
@@ -550,6 +551,7 @@ public partial class MainWindow : Window
         top.Click += (_, _) => { state.AlwaysOnTop = top.IsChecked; ApplyState(); Save(); };
         menu.Items.Add(top);
         menu.Items.Add(new MenuFlyoutSeparator());
+        if (state.LonghornMode) Item("Restore Windows taskbar", () => RestoreTaskbar_Click(this, new RoutedEventArgs()));
         Item("Exit Windows Sidebar Fluent", Close);
         menu.Opened += (_, _) => { sidebarMenuOpen = true; hideTimer.Stop(); };
         menu.Closed += (_, _) => { sidebarMenuOpen = false; QueueAutoHide(); };

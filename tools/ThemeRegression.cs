@@ -85,9 +85,35 @@ public partial class MainWindow
             for (int attempt = 0; attempt < 24 && (RunningItems.Children.Count == 0 || ShellTrayItems.Children.Count == 0); attempt++) await Task.Delay(500);
             if (RunningItems.Children.Count == 0 || ShellTrayItems.Children.Count == 0 || LonghornPanel.Visibility != Visibility.Visible) throw new Exception($"Longhorn UI not ready: mode={state.LonghornMode}, windows={RunningItems.Children.Count}, tray={ShellTrayItems.Children.Count}, error={shellBridge?.LastError}");
             if (LonghornPins.Children.Count != state.Shortcuts.Count) throw new Exception("Pinned icon grid count incorrect");
+            var buttons = RunningItems.Children.ToArray();
+            var unchanged = shellIconViews[RunningItems].Values.Select(view => view.Item).ToArray();
+            RenderShellEntries(RunningItems, unchanged, false);
+            if (!RunningItems.Children.SequenceEqual(buttons)) throw new Exception("Unchanged running apps were rebuilt");
+            state.LonghornHideTaskbar = true;
+            await shellBridge!.SendAsync(new { action = "replace", enabled = true });
+            for (int attempt = 0; attempt < 30 && !taskbarReplacementActive; attempt++) await Task.Delay(100);
+            GetWindowRect(WinRT.Interop.WindowNative.GetWindowHandle(this), out var full);
+            var screen = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary).OuterBounds;
+            if (!taskbarReplacementActive || full.Top != screen.Y || full.Bottom != screen.Y + screen.Height) throw new Exception($"Replacement height: active={taskbarReplacementActive}, bounds={full.Top}..{full.Bottom}, expected={screen.Y}..{screen.Y + screen.Height}, mode={state.LonghornMode}, error={shellBridge?.LastError}");
+            preferencesWindow?.Close(); LonghornApps_Click(this, new RoutedEventArgs());
+            await Task.Delay(300);
+            GridView? FindApps(DependencyObject node)
+            {
+                if (node is GridView grid) return grid;
+                for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) if (FindApps(VisualTreeHelper.GetChild(node, i)) is { } found) return found;
+                return null;
+            }
+            for (int attempt = 0; attempt < 36; attempt++)
+            {
+                if (preferencesWindow?.Content is DependencyObject content && FindApps(content) is { } readyGrid && readyGrid.Items.Count > 0) break;
+                await Task.Delay(250);
+            }
+            await Task.Delay(250);
+            if (preferencesWindow?.Content is not DependencyObject appsRoot || FindApps(appsRoot) is not { } appGrid || appGrid.Items.Count == 0 || appGrid.ItemTemplate is null) throw new Exception("Apps icon grid did not load");
+            if (appGrid.ContainerFromIndex(0) is not GridViewItem firstApp || firstApp.ContentTemplateRoot is not FrameworkElement appTile || appTile.FindName("AppName") is not TextBlock appName || string.IsNullOrWhiteSpace(appName.Text)) throw new Exception("Launcher tile name binding failed");
             state.LonghornMode = false; await UpdateLonghornAsync();
             if (LonghornPanel.Visibility != Visibility.Collapsed || shellBridge is not null) throw new Exception("Longhorn mode did not stop");
-            System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nPASS: hosted running apps/tray UI, pinned icon grid, opt-out restoration; side transitions, rapid reversal, screen edges, leap/non-leap calendar months, clock cards opened.");
+            System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nPASS: full monitor height with hidden taskbar, retained shell buttons, Apps icon grid, hosted running apps/tray UI, pinned icon grid, opt-out restoration; side transitions, rapid reversal, screen edges, leap/non-leap calendar months, clock cards opened.");
         }
         catch (Exception ex) { System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nFAIL: " + ex); }
         finally { state.LonghornMode = originalLonghorn; state.LonghornHideTaskbar = originalHide; await UpdateLonghornAsync(); await MoveSidebarAsync(originalSide); month = originalMonth; Close(); }

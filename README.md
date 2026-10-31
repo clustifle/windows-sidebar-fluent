@@ -21,9 +21,11 @@ Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica
 
 ## Longhorn mode
 
+Longhorn mode uses a compact slate rail inspired by [build 4074](https://betawiki.net/wiki/Windows_Longhorn_build_4074#Gallery), with flatter tiles, fine dividers, and a bottom Start strip. When it hides the Windows taskbar, the sidebar covers the full monitor height. Running-app and tray buttons are reused across updates; unchanged shell data is not resent.
+
 Enable **Longhorn mode** in Settings to add icon-only pins, running windows, a hosted application tray, Start, app search, Quick Settings, notifications, and input-language switching. The visible interface stays WinUI 3. ManagedShell runs in a separate helper only while this mode is enabled.
 
-**Hide Windows taskbar in Longhorn mode** is optional. **Restore Windows taskbar** turns the mode off immediately. Closing Sidebar restores the taskbar, and a recovery marker preserves its previous state if the helper stops unexpectedly. Explorer keeps the desktop and file windows; the login shell is never changed. Start and Windows panels open in their original Windows interfaces.
+**Hide Windows taskbar in Longhorn mode** is optional. **Restore Windows taskbar** turns the mode off immediately. Closing Sidebar restores the taskbar, and a recovery marker preserves its previous state if the helper stops unexpectedly. Explorer keeps the desktop and file windows; the login shell is never changed. Start and Windows panels open in their original Windows interfaces. The Apps popup is a searchable icon launcher with lazily loaded icons.
 
 Quick Launch has Pinned, Apps, and Web tabs. Import taskbar shortcuts to copy accessible `.lnk` pins, or select installed apps; Windows may store some pins elsewhere. Changes here do not edit Windows' own pin list.
 

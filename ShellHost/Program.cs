@@ -10,6 +10,7 @@ using System.Windows.Threading;
 using ManagedShell;
 using ManagedShell.WindowsTasks;
 using ManagedShell.WindowsTray;
+using NotifyIcon = ManagedShell.WindowsTray.NotifyIcon;
 using Application = System.Windows.Application;
 
 internal static class Program
@@ -17,6 +18,22 @@ internal static class Program
     static ShellManager? shell;
     static bool stopping;
     static string previous = "";
+    static volatile bool snapshotDirty = true;
+    static readonly HashSet<ApplicationWindow> observedWindows = new();
+    static readonly HashSet<NotifyIcon> observedTray = new();
+    static void MarkDirty(object? sender, System.ComponentModel.PropertyChangedEventArgs args) => snapshotDirty = true;
+    static void ObserveServices()
+    {
+        if (shell is null) return;
+        var windows = shell.Tasks.GroupedWindows.Cast<ApplicationWindow>().ToHashSet();
+        foreach (var removed in observedWindows.Except(windows).ToArray()) { removed.PropertyChanged -= MarkDirty; observedWindows.Remove(removed); }
+        foreach (var added in windows.Except(observedWindows)) { added.PropertyChanged += MarkDirty; observedWindows.Add(added); }
+        var tray = shell.NotificationArea.TrayIcons.ToHashSet();
+        foreach (var removed in observedTray.Except(tray).ToArray()) { removed.PropertyChanged -= MarkDirty; observedTray.Remove(removed); }
+        foreach (var added in tray.Except(observedTray)) { added.PropertyChanged += MarkDirty; observedTray.Add(added); }
+        snapshotDirty = true;
+    }
+    static string TrayId(NotifyIcon icon) => icon.GUID != Guid.Empty ? icon.GUID.ToString("D") : icon.HWnd.ToInt64() + ":" + icon.UID;
     static readonly Dictionary<ImageSource, string> images = new();
     static int parent;
     static long parentStarted;
@@ -52,6 +69,9 @@ internal static class Program
             // Keep Explorer's Start menu and Windows-key handling available.
             RestoreExplorerRouting();
             if (shell.NotificationArea.IsFailed) throw new InvalidOperationException("Windows tray hosting failed");
+            shell.Tasks.GroupedWindows.CollectionChanged += (_, _) => ObserveServices();
+            shell.NotificationArea.TrayIcons.CollectionChanged += (_, _) => ObserveServices();
+            ObserveServices();
             var poll = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             poll.Tick += (_, _) =>
             {
@@ -104,10 +124,12 @@ internal static class Program
     {
         if (shell is null) return;
         RestoreExplorerRouting();
+        if (!snapshotDirty) return;
+        snapshotDirty = false;
         var windows = shell.Tasks.GroupedWindows.Cast<ApplicationWindow>().Where(w => w.ShowInTaskbar && w.ProcId != (uint)parent).Take(128)
             .Select(w => new { id = w.Handle.ToInt64().ToString(), title = w.Title, icon = Icon(w.Icon), active = w.State == ApplicationWindow.WindowState.Active }).ToArray();
         var tray = shell.NotificationArea.TrayIcons.Where(i => !i.IsHidden).Take(128)
-            .Select(i => new { id = i.Identifier, title = i.Title, icon = Icon(i.Icon) }).ToArray();
+            .Select(i => new { id = TrayId(i), title = i.Title, icon = Icon(i.Icon) }).ToArray();
         string data = JsonSerializer.Serialize(new { windows, tray, ready = true, hidden = shell.ExplorerHelper.HideExplorerTaskbar });
         if (data == previous) return; previous = data;
         Console.WriteLine("SIDEBAR:" + data); Console.Out.Flush();
@@ -130,6 +152,7 @@ internal static class Program
                     File.WriteAllText(recovery, ((int)shell.ExplorerHelper.GetTaskbarState()).ToString());
                 }
                 shell.ExplorerHelper.HideExplorerTaskbar = enabled;
+                snapshotDirty = true;
                 if (!enabled) Recover(false);
                 return;
             }
@@ -142,7 +165,7 @@ internal static class Program
             else if (action == "close") shell.Tasks.GroupedWindows.Cast<ApplicationWindow>().FirstOrDefault(w => w.Handle.ToInt64().ToString() == id)?.Close();
             else if (action is "tray" or "trayMenu")
             {
-                var icon = shell.NotificationArea.TrayIcons.FirstOrDefault(i => i.Identifier == id);
+                var icon = shell.NotificationArea.TrayIcons.FirstOrDefault(i => TrayId(i) == id);
                 if (icon is null) return;
                 int x = root.GetProperty("x").GetInt32(), y = root.GetProperty("y").GetInt32();
                 icon.Placement = new ManagedShell.Interop.NativeMethods.Rect { Left = x - 12, Top = y - 12, Right = x + 12, Bottom = y + 12 };
