@@ -128,7 +128,7 @@ internal sealed class DesktopAppBar : IDisposable
                     Register();
                     QueuePosition();
                 }
-                else if (message is 0x007E or 0x02E0) QueuePosition(); // display / DPI change
+                else if (message is 0x001A or 0x007E or 0x02E0) QueuePosition(); // work-area/taskbar edge, display, or DPI change
                 else if (message == 0x0006 && registered)
                 {
                     var notification = Data();

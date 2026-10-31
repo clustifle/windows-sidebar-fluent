@@ -17,31 +17,35 @@ public sealed class LaunchShortcut
 public partial class MainWindow
 {
     private readonly Dictionary<string, BitmapImage> shortcutImages = new();
-    private readonly HashSet<LaunchShortcut> loadingShortcutIcons = [];
+    private readonly Dictionary<string, Task<string>> loadingShortcutIcons = new();
 
     private void RefreshQuickLaunch()
     {
         state.Shortcuts ??= [];
-        LaunchItems.Children.Clear();
+        void Render(Grid grid)
+        {
+        grid.Children.Clear(); grid.RowDefinitions.Clear();
         foreach (var shortcut in state.Shortcuts)
         {
-            var row = new Grid { ColumnSpacing = 10 };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(24) });
-            row.ColumnDefinitions.Add(new ColumnDefinition());
+            var row = new Grid { Width = 28, Height = 28 };
             bool website = IsWebsite(shortcut.Target);
             var fallback = new FontIcon { Glyph = website ? "\uE774" : "\uE8A5", FontSize = 20 };
             row.Children.Add(fallback);
-            var image = new Image { Width = 24, Height = 24, Visibility = Visibility.Collapsed };
+            var image = new Image { Width = 28, Height = 28, Visibility = Visibility.Collapsed };
             row.Children.Add(image);
-            var label = new TextBlock { Text = shortcut.Name, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
-            Grid.SetColumn(label, 1); row.Children.Add(label);
-            var button = new Button { Content = row, HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch, Style = (Style)Root.Resources["RailButton"] };
+            var button = new Button { Content = row, Width = 40, Height = 40, Padding = new Thickness(6), Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0) };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, shortcut.Name);
             ToolTipService.SetToolTip(button, shortcut.Name);
             button.Click += async (_, _) => await OpenShortcut(shortcut);
-            LaunchItems.Children.Add(button);
+            int index = grid.Children.Count;
+            Grid.SetColumn(button, index % 4); Grid.SetRow(button, index / 4);
+            if (index % 4 == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.Children.Add(button);
             if (!website) LoadShortcutIcon(shortcut, image, fallback);
         }
-        if (state.Shortcuts.Count == 0) LaunchItems.Children.Add(new TextBlock { Text = "Choose Edit to add apps or websites.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        if (state.Shortcuts.Count == 0) grid.Children.Add(new TextBlock { Text = "Choose Edit to add apps or websites.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        }
+        Render(LaunchItems); Render(LonghornPins);
     }
 
     private static bool IsWebsite(string target) => Uri.TryCreate(target, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https");
@@ -54,9 +58,10 @@ public partial class MainWindow
             {
                 if (string.IsNullOrEmpty(shortcut.IconData) || shortcut.IconVersion < 2)
                 {
-                    if (!loadingShortcutIcons.Add(shortcut)) return;
-                    try { shortcut.IconData = await ShortcutIcons.GetEmbeddedAsync(shortcut.Target); shortcut.IconVersion = 2; }
-                    finally { loadingShortcutIcons.Remove(shortcut); }
+                    if (!loadingShortcutIcons.TryGetValue(shortcut.Target, out var iconTask))
+                        loadingShortcutIcons[shortcut.Target] = iconTask = ShortcutIcons.GetEmbeddedAsync(shortcut.Target);
+                    try { shortcut.IconData = await iconTask; shortcut.IconVersion = 2; }
+                    finally { loadingShortcutIcons.Remove(shortcut.Target); }
                     if (string.IsNullOrEmpty(shortcut.IconData)) return;
                     Save();
                 }
@@ -91,11 +96,18 @@ public partial class MainWindow
     {
         if (dialogOpen) { preferencesWindow?.Activate(); return; }
         var panel = new StackPanel { Spacing = 12 };
-        panel.Children.Add(new TextBlock { Text = "Choose an installed app", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        var appPanel = new StackPanel { Spacing = 10 };
+        var webPanel = new StackPanel { Spacing = 10 };
+        var pinnedPanel = new StackPanel { Spacing = 10 };
+        var tabs = new Pivot();
+        tabs.Items.Add(new PivotItem { Header = "Pinned", Content = pinnedPanel });
+        tabs.Items.Add(new PivotItem { Header = "Apps", Content = appPanel });
+        tabs.Items.Add(new PivotItem { Header = "Web", Content = webPanel });
+        panel.Children.Add(tabs);
         var search = new TextBox { PlaceholderText = "Search installed apps" };
         var appsList = new ListView { Height = 180, SelectionMode = ListViewSelectionMode.Single };
         var addApp = new Button { Content = "Add selected app", IsEnabled = false };
-        panel.Children.Add(search); panel.Children.Add(appsList); panel.Children.Add(addApp);
+        appPanel.Children.Add(search); appPanel.Children.Add(appsList); appPanel.Children.Add(addApp);
         var status = new TextBlock { Text = "Loading installed apps…", FontSize = 12, TextWrapping = TextWrapping.Wrap };
         panel.Children.Add(status);
         IReadOnlyList<InstalledApp> apps = [];
@@ -111,9 +123,11 @@ public partial class MainWindow
         var nameBox = new TextBox { Header = "Website name", PlaceholderText = "Name" };
         var urlBox = new TextBox { Header = "Website address", PlaceholderText = "https://example.com" };
         var addWebsite = new Button { Content = "Add website" };
-        panel.Children.Add(nameBox); panel.Children.Add(urlBox); panel.Children.Add(addWebsite);
-        panel.Children.Add(new TextBlock { Text = "Your shortcuts", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        var list = new StackPanel { Spacing = 12 }; panel.Children.Add(list);
+        webPanel.Children.Add(nameBox); webPanel.Children.Add(urlBox); webPanel.Children.Add(addWebsite);
+                pinnedPanel.Children.Add(new TextBlock { Text = "Use the arrows to reorder your icons. Hover an icon on the sidebar to see its name.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        var importPins = new Button { Content = "Import taskbar shortcuts" };
+        pinnedPanel.Children.Add(importPins);
+        var list = new StackPanel { Spacing = 12 }; pinnedPanel.Children.Add(list);
         void Persist()
         {
             if (!state.QuickLaunch && state.Shortcuts.Count > 0) { state.QuickLaunch = true; ApplyState(); }
@@ -138,15 +152,29 @@ public partial class MainWindow
                     entry.Children.Add(address);
                 }
                 var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-                var up = new Button { Content = "Up", IsEnabled = position > 0 };
-                var down = new Button { Content = "Down", IsEnabled = position < state.Shortcuts.Count - 1 };
-                var remove = new Button { Content = "Remove" };
+                var up = new Button { Content = new FontIcon { Glyph = "\uE70E", FontSize = 12 }, Padding = new Thickness(8), IsEnabled = position > 0 };
+                var down = new Button { Content = new FontIcon { Glyph = "\uE70D", FontSize = 12 }, Padding = new Thickness(8), IsEnabled = position < state.Shortcuts.Count - 1 };
+                var remove = new Button { Content = new FontIcon { Glyph = "\uE74D", FontSize = 12 }, Padding = new Thickness(8) };
+                Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(up, "Move up"); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(down, "Move down"); Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(remove, "Remove shortcut");
+                ToolTipService.SetToolTip(up, "Move up"); ToolTipService.SetToolTip(down, "Move down"); ToolTipService.SetToolTip(remove, "Remove shortcut");
                 up.Click += (_, _) => { (state.Shortcuts[position - 1], state.Shortcuts[position]) = (state.Shortcuts[position], state.Shortcuts[position - 1]); Persist(); Render(); };
                 down.Click += (_, _) => { (state.Shortcuts[position + 1], state.Shortcuts[position]) = (state.Shortcuts[position], state.Shortcuts[position + 1]); Persist(); Render(); };
                 remove.Click += (_, _) => { state.Shortcuts.Remove(shortcut); Persist(); Render(); };
                 buttons.Children.Add(up); buttons.Children.Add(down); buttons.Children.Add(remove); entry.Children.Add(buttons); list.Children.Add(entry);
             }
         }
+        importPins.Click += async (_, _) =>
+        {
+            string folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Internet Explorer", "Quick Launch", "User Pinned", "TaskBar");
+            int count = 0;
+            if (Directory.Exists(folder))
+                foreach (string file in Directory.EnumerateFiles(folder, "*.lnk").Take(64))
+                {
+                    if (state.Shortcuts.Any(s => s.Target.Equals(file, StringComparison.OrdinalIgnoreCase))) continue;
+                    state.Shortcuts.Add(new LaunchShortcut { Name = Path.GetFileNameWithoutExtension(file), Target = file, IconData = await ShortcutIcons.GetEmbeddedAsync(file), IconVersion = 2 }); count++;
+                }
+            Persist(); Render(); status.Text = count == 0 ? "No new taskbar shortcut files found. Use Apps to add other pins." : $"Imported {count} shortcuts.";
+        };
         addApp.Click += async (_, _) =>
         {
             int selected = appsList.SelectedIndex;

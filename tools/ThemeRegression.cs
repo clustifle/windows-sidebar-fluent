@@ -59,6 +59,7 @@ public partial class MainWindow
     {
         bool originalSide = state.Left;
         var originalMonth = month;
+        bool originalLonghorn = state.LonghornMode, originalHide = state.LonghornHideTaskbar;
         try
         {
             foreach (bool left in new[] { !originalSide, originalSide })
@@ -79,10 +80,17 @@ public partial class MainWindow
             preferencesWindow?.Close(); CustomizeClock_Click(this, new RoutedEventArgs());
             await Task.Delay(200);
             if (preferencesWindow is null) throw new Exception("Clock cards failed to open");
-            System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nPASS: side transitions, rapid reversal, screen edges, leap/non-leap calendar months, clock cards opened.");
+            state.LonghornMode = true; state.LonghornHideTaskbar = false;
+            await UpdateLonghornAsync();
+            for (int attempt = 0; attempt < 24 && (RunningItems.Children.Count == 0 || ShellTrayItems.Children.Count == 0); attempt++) await Task.Delay(500);
+            if (RunningItems.Children.Count == 0 || ShellTrayItems.Children.Count == 0 || LonghornPanel.Visibility != Visibility.Visible) throw new Exception($"Longhorn UI not ready: mode={state.LonghornMode}, windows={RunningItems.Children.Count}, tray={ShellTrayItems.Children.Count}, error={shellBridge?.LastError}");
+            if (LonghornPins.Children.Count != state.Shortcuts.Count) throw new Exception("Pinned icon grid count incorrect");
+            state.LonghornMode = false; await UpdateLonghornAsync();
+            if (LonghornPanel.Visibility != Visibility.Collapsed || shellBridge is not null) throw new Exception("Longhorn mode did not stop");
+            System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nPASS: hosted running apps/tray UI, pinned icon grid, opt-out restoration; side transitions, rapid reversal, screen edges, leap/non-leap calendar months, clock cards opened.");
         }
         catch (Exception ex) { System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nFAIL: " + ex); }
-        finally { await MoveSidebarAsync(originalSide); month = originalMonth; Close(); }
+        finally { state.LonghornMode = originalLonghorn; state.LonghornHideTaskbar = originalHide; await UpdateLonghornAsync(); await MoveSidebarAsync(originalSide); month = originalMonth; Close(); }
     }
 }
 #endif

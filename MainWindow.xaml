@@ -4,7 +4,7 @@
    <Style x:Key="RailButton" TargetType="Button"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="6,8"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
    <Style x:Key="GadgetTile" TargetType="Border"><Setter Property="Padding" Value="12"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
   </Grid.Resources>
-  <Grid.RowDefinitions><RowDefinition Height="0"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Grid.RowDefinitions><RowDefinition Height="0"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0"><StackPanel x:Name="GadgetStack" Spacing="12">
   <Border x:Name="ClockGadget" Style="{StaticResource GadgetTile}" DoubleTapped="Clock_DoubleTapped"><StackPanel Spacing="4" HorizontalAlignment="Center">
    <Viewbox x:Name="ClockView" Width="96" Height="96"><Canvas x:Name="ClockFace" Width="156" Height="156" AutomationProperties.Name="Analog clock"/></Viewbox>
@@ -62,7 +62,7 @@
    </StackPanel></Border>
    <Border x:Name="LaunchCategory" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8">
     <Grid><TextBlock Text="Quick launch" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Click="CustomizeLaunch_Click" Content="Edit" FontSize="11" HorizontalAlignment="Right"  Padding="4" Background="Transparent" BorderThickness="0"/></Grid>
-    <StackPanel x:Name="LaunchItems" Spacing="4"/>
+    <Grid x:Name="LaunchItems" RowSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid>
    </StackPanel></Border>
   </StackPanel></ScrollViewer>
   <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
@@ -70,6 +70,14 @@
    <Button x:Name="NextPage" Click="NextPage_Click" AutomationProperties.Name="Next gadget page" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76C;" FontSize="12"/></Button>
    <Button Click="Add_Click" AutomationProperties.Name="Add or customize gadgets" ToolTipService.ToolTip="Add gadgets" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE710;" FontSize="12"/></Button>
    <TextBlock x:Name="PageIndicator" Visibility="Collapsed"/>
+  </StackPanel>
+  <StackPanel x:Name="LonghornPanel" Grid.Row="5" Visibility="Collapsed" Spacing="8">
+   <Grid ColumnSpacing="6"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Content="Start" Click="LonghornStart_Click" HorizontalAlignment="Stretch"/><Button Grid.Column="1" Content="Apps" Click="LonghornApps_Click"/></Grid>
+   <ScrollViewer MaxHeight="96" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="LonghornPins" RowSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer>
+   <ScrollViewer MaxHeight="112" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="RunningItems" RowSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer>
+   <ScrollViewer MaxHeight="76" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="ShellTrayItems" RowSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer>
+   <Grid x:Name="LonghornSystemButtons" ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid>
+   <Button Content="Restore Windows taskbar" Click="RestoreTaskbar_Click" FontSize="11" Padding="6,3" HorizontalAlignment="Stretch"/>
   </StackPanel>
   <TextBlock Grid.Row="4" x:Name="PanelStatus" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
  </Grid>

@@ -19,6 +19,16 @@ Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica
 - Settings offer Light, Dark, or System theme; Acrylic/Mica; width; left/right docking; and optional animated auto-hide.
 - Docked mode reserves desktop space. Auto-hide keeps only a thin reveal strip and overlays the sidebar when opened.
 
+## Longhorn mode
+
+Enable **Longhorn mode** in Settings to add icon-only pins, running windows, a hosted application tray, Start, app search, Quick Settings, notifications, and input-language switching. The visible interface stays WinUI 3. ManagedShell runs in a separate helper only while this mode is enabled.
+
+**Hide Windows taskbar in Longhorn mode** is optional. **Restore Windows taskbar** turns the mode off immediately. Closing Sidebar restores the taskbar, and a recovery marker preserves its previous state if the helper stops unexpectedly. Explorer keeps the desktop and file windows; the login shell is never changed. Start and Windows panels open in their original Windows interfaces.
+
+Quick Launch has Pinned, Apps, and Web tabs. Import taskbar shortcuts to copy accessible `.lnk` pins, or select installed apps; Windows may store some pins elsewhere. Changes here do not edit Windows' own pin list.
+
+Sidebar negotiates screen space with the shell on every taskbar/work-area change, including top, bottom, left, and right taskbars. Broader testing on movable-taskbar releases and multiple displays is still needed.
+
 ## Gadgets
 
 | Gadget | Features |
@@ -55,6 +65,8 @@ dotnet tool install --global wix --version 6.0.2 --allow-roll-forward
 .\tools\Build-Installer.ps1
 ```
 
+Publishing also builds the shell helper and includes its Windows desktop runtime. The two executables share the bundled .NET runtime files. The helper is not loaded in ordinary sidebar mode.
+
 The MSI is written to `artifacts\installer`. `tools\Build-Icon.ps1` regenerates the multi-resolution app icon from the included Fluent artwork.
 
 ## Data and startup
@@ -63,7 +75,7 @@ Preferences, shortcut icons, and notes are stored in `%LOCALAPPDATA%\ClassicSide
 
 ## Scope and verification
 
-This is a new application, not Microsoft's original Sidebar or an original `.gadget` package runtime. Explorer replacement, detached gadgets, and drag-out desktop placement are not implemented. Apps that choose explicit bounds or full-screen mode may cover reserved space.
+This is a new application, not Microsoft's original Sidebar or an original `.gadget` package runtime. Changing the Windows login shell, detached gadgets, and drag-out desktop placement are not implemented. Apps that choose explicit bounds or full-screen mode may cover reserved space.
 
 Local checks cover repeated Light/Dark/System changes through the settings selector, build/startup, shell edge reservation and release, taskbar exclusion, app discovery and icon transparency, solvable puzzle generation/restoration, and bounded RSS/Atom parsing. Broader interactive testing is still needed for multiple monitors/DPI, Explorer restarts, accessibility themes, and every pointer/animation path.
 

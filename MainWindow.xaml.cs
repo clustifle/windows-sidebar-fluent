@@ -84,11 +84,13 @@ public partial class MainWindow : Window
         if (StartupPreference.Enabled) SetStartup(true);
         PositionSidebar();
         ApplyAutoHidePreference();
+        InitializeLonghorn();
     }
 
     private void HideFromTaskSwitchers()
     {
-        AppWindow.IsShownInSwitchers = false;
+        try { AppWindow.IsShownInSwitchers = false; }
+        catch (Exception ex) when (ex is NotImplementedException or COMException) { /* Native tool-window styles below remain authoritative. */ }
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
         const int extendedStyle = -20;
         const long toolWindow = 0x00000080;
@@ -143,6 +145,7 @@ public partial class MainWindow : Window
 
     private void SynchronizeAppearance()
     {
+        if (closing) return;
         var background = windowsAppearance.GetColorValue(UIColorType.Background);
         var requestedTheme = state.Theme switch
         {
@@ -232,7 +235,7 @@ public partial class MainWindow : Window
     private void ApplyGadgetPage()
     {
         foreach (var id in state.GadgetOrder) GadgetElement(id).Visibility = Visibility.Collapsed;
-        var enabled = state.GadgetOrder.Where(GadgetEnabled).ToArray();
+        var enabled = state.GadgetOrder.Where(id => GadgetEnabled(id) && !(state.LonghornMode && id == "Quick launch")).ToArray();
         int density = Math.Clamp(state.GadgetsPerPage, 1, 3);
         int pages = Math.Max(1, (enabled.Length + density - 1) / density);
         state.PageIndex = Math.Clamp(state.PageIndex, 0, pages - 1);
@@ -445,6 +448,13 @@ public partial class MainWindow : Window
         var slideInterval = new NumberBox { Header = "Slide show interval (seconds)", Minimum = 5, Maximum = 120, Value = state.SlideInterval, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
         slideInterval.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { state.SlideInterval = (int)args.NewValue; UpdateClassicGadgets(); Save(); } };
         panel.Children.Add(slideInterval);
+        var longhorn = new ToggleSwitch { Header = "Longhorn mode", IsOn = state.LonghornMode };
+        longhorn.Toggled += async (_, _) => { state.LonghornMode = longhorn.IsOn; Save(); await UpdateLonghornAsync(); };
+        panel.Children.Add(longhorn);
+        var replace = new ToggleSwitch { Header = "Hide Windows taskbar in Longhorn mode", IsOn = state.LonghornHideTaskbar };
+        replace.Toggled += async (_, _) => { state.LonghornHideTaskbar = replace.IsOn; Save(); if (shellBridge is not null) await shellBridge.SendAsync(new { action = "replace", enabled = state.LonghornHideTaskbar }); };
+        panel.Children.Add(replace);
+        panel.Children.Add(new TextBlock { Text = "Longhorn mode adds running apps and a hosted tray. Explorer keeps the desktop. Restore Windows taskbar is always available.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         AddToggle(panel, "Start with Windows", StartupPreference.Enabled, SetStartup);
         var side = new ToggleSwitch { Header = "Place on the left", IsOn = state.Left };
         side.Toggled += async (_, _) => await MoveSidebarAsync(side.IsOn);
@@ -475,7 +485,8 @@ public partial class MainWindow : Window
         dialogOpen = true;
         var completion = new TaskCompletionSource<bool>();
         var window = new Window { Title = $"Windows Sidebar Fluent — {title}", SystemBackdrop = new SidebarBackdrop(true) };
-        window.AppWindow.IsShownInSwitchers = false;
+        try { window.AppWindow.IsShownInSwitchers = false; }
+        catch (Exception ex) when (ex is NotImplementedException or COMException) { /* The owner window below also excludes this dialog from the taskbar. */ }
         preferencesWindow = window;
         var layout = new Grid { Padding = new Thickness(24), RowSpacing = 20 };
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -668,6 +679,8 @@ public sealed class SidebarState
     public string Theme { get; set; } = "System";
     public int Width { get; set; } = 240;
     public bool CompactClock { get; set; } = true;
+    public bool LonghornMode { get; set; }
+    public bool LonghornHideTaskbar { get; set; }
     public bool AutoHide { get; set; }
     public string ClockStyle { get; set; } = "Analog + digital";
     public bool ShowSeconds { get; set; }
