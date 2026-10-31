@@ -65,8 +65,10 @@ Preferences, shortcut icons, and notes are stored in `%LOCALAPPDATA%\ClassicSide
 
 This is a new application, not Microsoft's original Sidebar or an original `.gadget` package runtime. Explorer replacement, detached gadgets, and drag-out desktop placement are not implemented. Apps that choose explicit bounds or full-screen mode may cover reserved space.
 
-Local checks cover build/startup, shell edge reservation and release, taskbar exclusion, app discovery and icon transparency, solvable puzzle generation/restoration, and bounded RSS/Atom parsing. Broader interactive testing is still needed for multiple monitors/DPI, Explorer restarts, accessibility themes, and every pointer/animation path.
+Local checks cover repeated Light/Dark/System changes through the settings selector, build/startup, shell edge reservation and release, taskbar exclusion, app discovery and icon transparency, solvable puzzle generation/restoration, and bounded RSS/Atom parsing. Broader interactive testing is still needed for multiple monitors/DPI, Explorer restarts, accessibility themes, and every pointer/animation path.
 
 ## License
 
 MIT. See [LICENSE](LICENSE). Microsoft Fluent System Icons artwork is separately attributed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Theme regression: publish with `-p:DefineConstants=THEME_REGRESSION` to a separate test folder and run that build with no other Sidebar instance open. It cycles the settings selector six times, checks actual themes and gadget identity, restores the original theme, and writes `theme-test-result.txt` beside the test executable. Normal builds exclude this test.

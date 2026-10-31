@@ -4,6 +4,7 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RootNamespace>Sidebar</RootNamespace>
+    <Version>1.0.1</Version>
     <AssemblyName>Windows Sidebar Fluent</AssemblyName>
     <ApplicationIcon>Assets\Sidebar.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>

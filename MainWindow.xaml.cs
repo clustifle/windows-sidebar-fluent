@@ -22,6 +22,8 @@ public partial class MainWindow : Window
     private SidebarState state = new();
     private DateTime month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private bool ready;
+    private bool appearanceRefreshQueued;
+    private bool closing;
     private DesktopAppBar? appBar;
     private TrayIcon? trayIcon;
     private bool dialogOpen;
@@ -54,7 +56,7 @@ public partial class MainWindow : Window
         HideFromTaskSwitchers();
         ready = true;
         windowsAppearance.ColorValuesChanged += WindowsAppearance_Changed;
-        Root.ActualThemeChanged += (_, _) => { clockFaceDirty = true; if (ready) { RenderCalendar(); UpdateGadgets(); } };
+        Root.ActualThemeChanged += (_, _) => QueueAppearanceRefresh();
         RenderCalendar();
         UpdateGadgets();
         timer.Tick += (_, _) => UpdateGadgets();
@@ -62,7 +64,7 @@ public partial class MainWindow : Window
         UpdateTimerInterval();
         timer.Start();
         Activated += (_, _) => SynchronizeAppearance();
-        Closed += (_, _) => { preferencesWindow?.Close(); windowsAppearance.ColorValuesChanged -= WindowsAppearance_Changed; trayIcon?.Dispose(); appBar?.Dispose(); timer.Stop(); saveTimer.Stop(); Save(); };
+        Closed += (_, _) => { closing = true; preferencesWindow?.Close(); windowsAppearance.ColorValuesChanged -= WindowsAppearance_Changed; trayIcon?.Dispose(); appBar?.Dispose(); timer.Stop(); saveTimer.Stop(); Save(); };
     }
 
     public void AttachToDesktop()
@@ -121,20 +123,36 @@ public partial class MainWindow : Window
     }
 
     private void WindowsAppearance_Changed(UISettings sender, object args)
-        => DispatcherQueue.TryEnqueue(() => { clockFaceDirty = true; SynchronizeAppearance(); RenderCalendar(); UpdateGadgets(); });
+        => DispatcherQueue.TryEnqueue(() => { if (!closing) { SynchronizeAppearance(); QueueAppearanceRefresh(); } });
+
+    private void QueueAppearanceRefresh()
+    {
+        if (!ready || closing || appearanceRefreshQueued) return;
+        appearanceRefreshQueued = true;
+        // Let WinUI finish walking the theme tree before replacing calendar/clock children.
+        if (!DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+        {
+            appearanceRefreshQueued = false;
+            if (closing) return;
+            clockFaceDirty = true;
+            RenderCalendar();
+            UpdateGadgets();
+        })) appearanceRefreshQueued = false;
+    }
 
     private void SynchronizeAppearance()
     {
         var background = windowsAppearance.GetColorValue(UIColorType.Background);
-        Root.RequestedTheme = state.Theme switch
+        var requestedTheme = state.Theme switch
         {
             "Light" => ElementTheme.Light,
             "Dark" => ElementTheme.Dark,
             _ => (background.R * 299 + background.G * 587 + background.B * 114) >= 128000 ? ElementTheme.Light : ElementTheme.Dark
         };
+        if (Root.RequestedTheme != requestedTheme) Root.RequestedTheme = requestedTheme;
         if (preferencesWindow?.Content is FrameworkElement preferencesRoot)
         {
-            preferencesRoot.RequestedTheme = Root.RequestedTheme;
+            if (preferencesRoot.RequestedTheme != requestedTheme) preferencesRoot.RequestedTheme = requestedTheme;
             preferencesWindow.AppWindow.TitleBar.ButtonForegroundColor = Root.RequestedTheme == ElementTheme.Dark ? Colors.White : Colors.Black;
             preferencesWindow.AppWindow.TitleBar.ButtonInactiveForegroundColor = Root.RequestedTheme == ElementTheme.Dark ? Colors.LightGray : Colors.DimGray;
         }
@@ -377,7 +395,15 @@ public partial class MainWindow : Window
         if (dialogOpen) { preferencesWindow?.Activate(); return; }
         var panel = new StackPanel { Spacing = 12 };
         var theme = new ComboBox { Header = "Theme", ItemsSource = new[] { "System", "Light", "Dark" }, SelectedItem = state.Theme, HorizontalAlignment = HorizontalAlignment.Stretch };
-        theme.SelectionChanged += (_, _) => { state.Theme = (string)theme.SelectedItem; ApplyState(); Save(); };
+        theme.SelectionChanged += (_, _) =>
+        {
+            if (theme.SelectedItem is not string selected || state.Theme == selected) return;
+            state.Theme = selected;
+            // Appearance changes do not reparent gadgets or change appbar geometry.
+            SynchronizeAppearance();
+            QueueAppearanceRefresh();
+            Save();
+        };
         panel.Children.Add(theme);
         var material = new ComboBox { Header = "Material", ItemsSource = new[] { "Acrylic", "Mica" }, SelectedItem = state.Material, HorizontalAlignment = HorizontalAlignment.Stretch };
         material.SelectionChanged += (_, _) => { state.Material = (string)material.SelectedItem; ApplyState(); Save(); };

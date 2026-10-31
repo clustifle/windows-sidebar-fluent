@@ -1,7 +1,7 @@
 param(
     [string]$PublishDirectory = (Join-Path $PSScriptRoot '..\artifacts\Windows Sidebar Fluent'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\artifacts\installer'),
-    [string]$Version = '1.0.0',
+    [string]$Version = '1.0.1',
     [string]$WixPath = 'wix'
 )
 $ErrorActionPreference = 'Stop'

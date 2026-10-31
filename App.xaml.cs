@@ -19,6 +19,9 @@ public partial class App : Application
             window = new MainWindow();
             window.Activate();
             window.AttachToDesktop();
+#if THEME_REGRESSION
+            window.RunThemeRegression();
+#endif
         }
         catch (Exception ex) { LogFailure(ex); throw; }
     }
