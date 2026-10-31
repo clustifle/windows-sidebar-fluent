@@ -353,7 +353,7 @@ public partial class MainWindow : Window
         int first = (int)culture.FirstDayOfWeek;
         int offset = ((int)month.DayOfWeek - first + 7) % 7;
         int rows = 1 + (offset + DateTime.DaysInMonth(month.Year, month.Month) + 6) / 7;
-        for (int i = 0; i < rows; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(state.LonghornMode ? 26 : 28) });
+        for (int i = 0; i < rows; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(state.LonghornMode ? 23 : 28) });
         for (int i = 0; i < 7; i++) AddDay(culture.GetShortestDayName((DayOfWeek)((i + first) % 7)), 0, i, false);
         for (int day = 1; day <= DateTime.DaysInMonth(month.Year, month.Month); day++)
         {
@@ -365,7 +365,7 @@ public partial class MainWindow : Window
     private void AddDay(string text, int row, int column, bool today)
     {
         var label = new TextBlock { Text = text, FontSize = row == 0 ? 10 : 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        var border = new Border { Child = label, CornerRadius = new CornerRadius(14), MinWidth = 22, Height = state.LonghornMode ? 26 : 28 };
+        var border = new Border { Child = label, CornerRadius = new CornerRadius(14), MinWidth = 22, Height = state.LonghornMode ? 23 : 28 };
         if (row == 0) label.Opacity = 0.6;
         if (today) { label.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold; border.Background = CpuBar.Foreground; label.Foreground = new SolidColorBrush(Colors.White); }
         Grid.SetRow(border, row); Grid.SetColumn(border, column); CalendarGrid.Children.Add(border);

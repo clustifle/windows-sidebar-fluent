@@ -103,10 +103,10 @@ public partial class MainWindow
         if (styledLonghorn == state.LonghornMode && styledTheme == Root.RequestedTheme && styledHighContrast == contrast) return;
         if (!state.LonghornMode) ClearShellEntries();
         styledLonghorn = state.LonghornMode; styledTheme = Root.RequestedTheme; styledHighContrast = contrast;
-        Root.Padding = state.LonghornMode ? new Thickness(6, 6, 6, 6) : new Thickness(10, 8, 10, 10);
+        Root.Padding = state.LonghornMode ? new Thickness(4, 4, 4, 4) : new Thickness(10, 8, 10, 10);
         Root.RowSpacing = state.LonghornMode ? 4 : 8;
-        GadgetStack.Spacing = state.LonghornMode ? 6 : 12;
-        MonthText.FontSize = state.LonghornMode ? 14 : 16;
+        GadgetStack.Spacing = state.LonghornMode ? 3 : 12;
+        MonthText.FontSize = state.LonghornMode ? 13 : 16;
         DateText.FontSize = state.LonghornMode ? 11 : 12;
         Root.Background = RailSurfaceBrush(Root.RequestedTheme);
         bool dark = Root.RequestedTheme == ElementTheme.Dark;
@@ -114,7 +114,7 @@ public partial class MainWindow
         {
             if (state.LonghornMode && !contrast)
             {
-                tile.CornerRadius = new CornerRadius(2); tile.Padding = new Thickness(10);
+                tile.CornerRadius = new CornerRadius(0); tile.Padding = new Thickness(6);
                 tile.Background = new SolidColorBrush(dark ? Windows.UI.Color.FromArgb(18, 224, 240, 248) : Windows.UI.Color.FromArgb(76, 255, 255, 255));
                 tile.BorderBrush = new SolidColorBrush(dark ? Windows.UI.Color.FromArgb(30, 224, 240, 248) : Windows.UI.Color.FromArgb(26, 30, 50, 60));
                 tile.BorderThickness = new Thickness(0, 0, 0, 1);
@@ -126,13 +126,17 @@ public partial class MainWindow
             }
         }
         if (ready) { RenderCalendar(); clockFaceDirty = true; UpdateGadgets(); }
-    }    private void ClearShellEntries()
+    }
+
+    private void ClearShellEntries()
     {
         RunningItems.Children.Clear(); RunningItems.RowDefinitions.Clear();
         ShellTrayItems.Children.Clear(); ShellTrayItems.RowDefinitions.Clear();
         shellIconViews.Clear();
         foreach (string key in shortcutImages.Keys.Where(key => key.StartsWith("shell-icon:", StringComparison.Ordinal)).ToArray()) shortcutImages.Remove(key);
-    }    private sealed class ShellIconView
+    }
+
+    private sealed class ShellIconView
     {
         public required ShellEntry Item;
         public required Button Button;
@@ -146,7 +150,7 @@ public partial class MainWindow
         var keys = items.Select(item => item.id).ToHashSet(StringComparer.Ordinal);
         foreach (string removed in views.Keys.Where(key => !keys.Contains(key)).ToArray())
         { grid.Children.Remove(views[removed].Button); views.Remove(removed); }
-        int columns = tray ? 6 : 5;
+        int columns = tray ? 8 : 5;
         int rows = (items.Length + columns - 1) / columns;
         while (grid.RowDefinitions.Count > rows) grid.RowDefinitions.RemoveAt(grid.RowDefinitions.Count - 1);
         while (grid.RowDefinitions.Count < rows) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -156,10 +160,10 @@ public partial class MainWindow
             bool created = !views.TryGetValue(item.id, out var view);
             if (created)
             {
-                var content = new Grid { Width = tray ? 16 : 22, Height = tray ? 16 : 22 };
+                var content = new Grid { Width = tray ? 14 : 20, Height = tray ? 14 : 20 };
                 var fallback = new FontIcon { Glyph = tray ? "\uE9CE" : "\uE737", FontSize = 16 }; content.Children.Add(fallback);
-                var image = new Image { Width = tray ? 16 : 22, Height = tray ? 16 : 22, Visibility = Visibility.Collapsed }; content.Children.Add(image);
-                var button = new Button { Content = content, Padding = new Thickness(tray ? 4 : 5), HorizontalAlignment = HorizontalAlignment.Stretch, Background = new SolidColorBrush(Colors.Transparent), BorderBrush = CpuBar.Foreground };
+                var image = new Image { Width = tray ? 14 : 20, Height = tray ? 14 : 20, Visibility = Visibility.Collapsed }; content.Children.Add(image);
+                var button = new Button { Content = content, Padding = new Thickness(tray ? 3 : 4), HorizontalAlignment = HorizontalAlignment.Stretch, Background = new SolidColorBrush(Colors.Transparent), BorderBrush = CpuBar.Foreground };
                 view = new ShellIconView { Item = item, Button = button, Image = image, Fallback = fallback }; views.Add(item.id, view);
                 button.Click += async (_, _) => await ShellEntryCommand(view.Item, tray ? "tray" : "window");
                 if (tray) button.RightTapped += async (_, args) => { args.Handled = true; await ShellEntryCommand(view.Item, "trayMenu"); };
@@ -179,7 +183,9 @@ public partial class MainWindow
             Grid.SetColumn(view.Button, index % columns); Grid.SetRow(view.Button, index / columns);
         }
         if (shortcutImages.Count > 256) shortcutImages.Clear();
-    }    private async Task ShellEntryCommand(ShellEntry entry, string action)
+    }
+
+    private async Task ShellEntryCommand(ShellEntry entry, string action)
     {
         if (shellBridge is null) return;
         GetCursorPos(out var point);
@@ -226,7 +232,8 @@ public partial class MainWindow
         {
             if (args.ClickedItem is not InstalledApp app) return;
             await OpenShortcut(new LaunchShortcut { Name = app.Name, Target = app.Target }); preferencesWindow?.Close();
-        };        _ = LoadApps();
+        };
+        _ = LoadApps();
         await ShowDialog("Apps", panel);
     }
     private async void RestoreTaskbar_Click(object sender, RoutedEventArgs e)

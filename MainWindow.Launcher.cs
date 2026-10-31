@@ -27,7 +27,7 @@ public partial class MainWindow
         grid.Children.Clear(); grid.RowDefinitions.Clear();
         foreach (var shortcut in state.Shortcuts)
         {
-            int iconSize = state.LonghornMode && grid == LonghornPins ? 24 : 28;
+            int iconSize = state.LonghornMode && grid == LonghornPins ? 20 : 28;
             var row = new Grid { Width = iconSize, Height = iconSize };
             bool website = IsWebsite(shortcut.Target);
             var fallback = new FontIcon { Glyph = website ? "\uE774" : "\uE8A5", FontSize = 20 };
