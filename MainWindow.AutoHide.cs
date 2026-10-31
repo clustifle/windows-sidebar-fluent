@@ -10,6 +10,8 @@ public partial class MainWindow
     private readonly DispatcherTimer hideTimer = new() { Interval = TimeSpan.FromSeconds(1) };
     private bool autoHideInitialized, autoHidden, sidebarMenuOpen, sidebarClosed;
     private int revealGeneration;
+    private bool sideMoveRunning;
+    private bool requestedLeft;
 
     private void InitializeAutoHide()
     {
@@ -35,13 +37,13 @@ public partial class MainWindow
 
     private void QueueAutoHide()
     {
-        if (!autoHideInitialized || sidebarClosed || !state.AutoHide || dialogOpen || classicPickerOpen || sidebarMenuOpen || draggingGadget is not null) return;
+        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || dialogOpen || classicPickerOpen || sidebarMenuOpen || draggingGadget is not null) return;
         hideTimer.Stop(); hideTimer.Start();
     }
 
     private void RevealSidebar()
     {
-        if (!autoHideInitialized || sidebarClosed) return;
+        if (!autoHideInitialized || sidebarClosed || sideMoveRunning) return;
         hideTimer.Stop(); revealGeneration++;
         var visual = ElementCompositionPreview.GetElementVisual(Root);
         visual.StopAnimation("Translation"); visual.StopAnimation("Opacity");
@@ -61,7 +63,7 @@ public partial class MainWindow
 
     private async void HideSidebar()
     {
-        if (autoHidden || sidebarClosed || !state.AutoHide) return;
+        if (autoHidden || sidebarClosed || sideMoveRunning || !state.AutoHide) return;
         int generation = ++revealGeneration;
         var visual = ElementCompositionPreview.GetElementVisual(Root);
         if (windowsAppearance.AnimationsEnabled)
@@ -79,6 +81,50 @@ public partial class MainWindow
         autoHidden = true; appBar?.SetRevealed(false);
     }
 
+    private async Task MoveSidebarAsync(bool left)
+    {
+        requestedLeft = left;
+        if (sideMoveRunning || sidebarClosed) return;
+        sideMoveRunning = true;
+        hideTimer.Stop(); revealGeneration++;
+        try
+        {
+            while (!sidebarClosed && requestedLeft != state.Left)
+            {
+                bool destination = requestedLeft;
+                var visual = ElementCompositionPreview.GetElementVisual(Root);
+                void Animate(float from, float to, float opacityFrom, float opacityTo, int milliseconds)
+                {
+                    visual.StopAnimation("Translation"); visual.StopAnimation("Opacity");
+                    var slide = visual.Compositor.CreateVector3KeyFrameAnimation();
+                    var easing = visual.Compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0), new Vector2(0, 1));
+                    slide.InsertKeyFrame(0, new Vector3(from, 0, 0)); slide.InsertKeyFrame(1, new Vector3(to, 0, 0), easing);
+                    slide.Duration = TimeSpan.FromMilliseconds(milliseconds);
+                    var fade = visual.Compositor.CreateScalarKeyFrameAnimation();
+                    fade.InsertKeyFrame(0, opacityFrom); fade.InsertKeyFrame(1, opacityTo); fade.Duration = slide.Duration;
+                    visual.StartAnimation("Translation", slide); visual.StartAnimation("Opacity", fade);
+                }
+                bool animate = windowsAppearance.AnimationsEnabled;
+                autoHidden = false; appBar?.SetRevealed(true);
+                if (animate) { Animate(0, state.Left ? -48 : 48, 1, 0, 120); await Task.Delay(130); }
+                if (sidebarClosed) return;
+                state.Left = destination;
+                appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide);
+                if (animate) { Animate(state.Left ? -48 : 48, 0, 0, 1, 200); await Task.Delay(210); }
+            }
+        }
+        finally
+        {
+            sideMoveRunning = false;
+            if (!sidebarClosed)
+            {
+                var visual = ElementCompositionPreview.GetElementVisual(Root);
+                visual.StopAnimation("Translation"); visual.StopAnimation("Opacity");
+                visual.Properties.InsertVector3("Translation", Vector3.Zero); visual.Opacity = 1;
+                Save(); QueueAutoHide();
+            }
+        }
+    }
     private bool CursorInsideSidebar()
     {
         var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);

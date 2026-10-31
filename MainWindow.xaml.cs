@@ -342,13 +342,14 @@ public partial class MainWindow : Window
     {
         lastDate = DateTime.Today;
         MonthText.Text = month.ToString("MMMM yyyy");
+        CalendarTodayText.Text = DateTime.Today.ToString("ddd, d MMM");
         CalendarGrid.Children.Clear(); CalendarGrid.ColumnDefinitions.Clear(); CalendarGrid.RowDefinitions.Clear();
         for (int i = 0; i < 7; i++) CalendarGrid.ColumnDefinitions.Add(new ColumnDefinition());
         var culture = CultureInfo.CurrentCulture.DateTimeFormat;
         int first = (int)culture.FirstDayOfWeek;
         int offset = ((int)month.DayOfWeek - first + 7) % 7;
         int rows = 1 + (offset + DateTime.DaysInMonth(month.Year, month.Month) + 6) / 7;
-        for (int i = 0; i < rows; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(26) });
+        for (int i = 0; i < rows; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(28) });
         for (int i = 0; i < 7; i++) AddDay(culture.GetShortestDayName((DayOfWeek)((i + first) % 7)), 0, i, false);
         for (int day = 1; day <= DateTime.DaysInMonth(month.Year, month.Month); day++)
         {
@@ -359,9 +360,10 @@ public partial class MainWindow : Window
 
     private void AddDay(string text, int row, int column, bool today)
     {
-        var label = new TextBlock { Text = text, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        var border = new Border { Child = label, CornerRadius = new CornerRadius(10), Width = 20, Height = 24 };
-        if (today) { border.Background = CpuBar.Foreground; label.Foreground = new SolidColorBrush(Colors.White); }
+        var label = new TextBlock { Text = text, FontSize = row == 0 ? 10 : 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var border = new Border { Child = label, CornerRadius = new CornerRadius(14), MinWidth = 22, Height = 28 };
+        if (row == 0) label.Opacity = 0.6;
+        if (today) { label.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold; border.Background = CpuBar.Foreground; label.Foreground = new SolidColorBrush(Colors.White); }
         Grid.SetRow(border, row); Grid.SetColumn(border, column); CalendarGrid.Children.Add(border);
     }
     private void PreviousMonth_Click(object sender, RoutedEventArgs e) { month = month.AddMonths(-1); RenderCalendar(); }
@@ -444,7 +446,9 @@ public partial class MainWindow : Window
         slideInterval.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { state.SlideInterval = (int)args.NewValue; UpdateClassicGadgets(); Save(); } };
         panel.Children.Add(slideInterval);
         AddToggle(panel, "Start with Windows", StartupPreference.Enabled, SetStartup);
-        AddToggle(panel, "Place on the left", state.Left, v => { state.Left = v; PositionSidebar(); });
+        var side = new ToggleSwitch { Header = "Place on the left", IsOn = state.Left };
+        side.Toggled += async (_, _) => await MoveSidebarAsync(side.IsOn);
+        panel.Children.Add(side);
         AddToggle(panel, "Keep above other windows", state.AlwaysOnTop, v => state.AlwaysOnTop = v);
         panel.Children.Add(new TextBlock { Text = "Sidebar reserves this screen edge. Maximized windows fit beside it. Closing Sidebar restores the space.", TextWrapping = TextWrapping.Wrap, MaxWidth = 250 });
         panel.Children.Add(new TextBlock { Text = "Notes and preferences are saved on this device.", TextWrapping = TextWrapping.Wrap, MaxWidth = 280 });

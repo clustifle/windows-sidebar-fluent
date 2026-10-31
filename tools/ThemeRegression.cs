@@ -41,7 +41,7 @@ public partial class MainWindow
                     state.Material = originalMaterial; ApplyState();
                     selector.SelectedItem = original;
                     System.IO.File.WriteAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "PASS: 24 settings changes across Acrylic/Mica; sidebar/settings content, both backdrop configurations, and surface contrast verified; dispatcher responsive; gadgets retained.");
-                    check.Stop(); Close(); return;
+                    check.Stop(); FinishMotionAndCalendarRegression(); return;
                 }
                 if (index % 6 == 0) { state.Material = index % 12 == 0 ? "Acrylic" : "Mica"; ApplyState(); }
                 selector.SelectedItem = modes[index++];
@@ -54,6 +54,35 @@ public partial class MainWindow
             }
         };
         check.Start();
+    }
+    private async void FinishMotionAndCalendarRegression()
+    {
+        bool originalSide = state.Left;
+        var originalMonth = month;
+        try
+        {
+            foreach (bool left in new[] { !originalSide, originalSide })
+            {
+                await MoveSidebarAsync(left);
+                if (state.Left != left || sideMoveRunning) throw new Exception("Side transition did not finish");
+                GetWindowRect(WinRT.Interop.WindowNative.GetWindowHandle(this), out var rect);
+                var monitor = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary).OuterBounds;
+                if ((left && rect.Left != monitor.X) || (!left && rect.Right != monitor.X + monitor.Width)) throw new Exception("Sidebar missed screen edge");
+            }
+            await Task.WhenAll(MoveSidebarAsync(!originalSide), MoveSidebarAsync(originalSide));
+            if (state.Left != originalSide) throw new Exception("Rapid side change lost final choice");
+            foreach (var date in new[] { new DateTime(2028, 2, 1), new DateTime(2027, 2, 1), new DateTime(2026, 8, 1) })
+            {
+                month = date; RenderCalendar();
+                if (CalendarGrid.Children.Count != 7 + DateTime.DaysInMonth(date.Year, date.Month)) throw new Exception("Calendar day count incorrect");
+            }
+            preferencesWindow?.Close(); CustomizeClock_Click(this, new RoutedEventArgs());
+            await Task.Delay(200);
+            if (preferencesWindow is null) throw new Exception("Clock cards failed to open");
+            System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nPASS: side transitions, rapid reversal, screen edges, leap/non-leap calendar months, clock cards opened.");
+        }
+        catch (Exception ex) { System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nFAIL: " + ex); }
+        finally { await MoveSidebarAsync(originalSide); month = originalMonth; Close(); }
     }
 }
 #endif
