@@ -26,36 +26,34 @@ public partial class MainWindow
             layout.Children.Add(content);
             var insertion = new Border { Height = 2, Background = CpuBar.Foreground, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
             insertionMarkers.Add(insertion);
-            var grip = new Border
+            gadget.CanDrag = true;
+            if (gadget.Background is null) gadget.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+            AutomationProperties.SetHelpText(gadget, "Drag the card background or heading to reorder. Settings also offers Move up and Move down.");
+            bool interactivePress = false;
+            gadget.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler((_, args) =>
             {
-                Width = 28, Height = 28, Padding = new Thickness(7), CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
-                HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, CanDrag = true,
-                Child = new FontIcon { Glyph = "\uE784", FontSize = 12, Opacity = 0.45, OpacityTransition = new ScalarTransition { Duration = TimeSpan.FromMilliseconds(100) } }
-            };
-            AutomationProperties.SetName(grip, $"Drag {id} gadget");
-            ToolTipService.SetToolTip(grip, $"Drag {id} to reorder. Hold over a page arrow to change pages.");
-            grip.PointerEntered += (_, _) =>
+                interactivePress = false;
+                for (DependencyObject? node = args.OriginalSource as DependencyObject; node is not null && node != gadget; node = VisualTreeHelper.GetParent(node))
+                    if (node is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase or TextBox or NumberBox or ComboBox or Slider or ToggleSwitch or Microsoft.UI.Xaml.Controls.Primitives.ScrollBar)
+                    { interactivePress = true; break; }
+            }), true);
+            gadget.DragStarting += (_, args) =>
             {
-                grip.Background = new SolidColorBrush(Root.ActualTheme == ElementTheme.Dark ? Windows.UI.Color.FromArgb(24, 255, 255, 255) : Windows.UI.Color.FromArgb(18, 0, 0, 0));
-                ((FontIcon)grip.Child).Opacity = 1;
-            };
-            grip.PointerExited += (_, _) => { grip.Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent); ((FontIcon)grip.Child).Opacity = 0.45; };
-            grip.DragStarting += (_, args) =>
-            {
+                if (interactivePress) { args.Cancel = true; return; }
                 draggingGadget = id; dragStartPage = state.PageIndex; dropCommitted = false;
                 hideTimer.Stop(); RevealSidebar();
                 args.Data.Properties[GadgetDragKey] = id;
                 args.Data.RequestedOperation = DataPackageOperation.Move;
                 gadget.Opacity = 0.55;
             };
-            grip.DropCompleted += (_, _) =>
+            gadget.DropCompleted += (_, _) =>
             {
                 gadget.Opacity = 1; draggingGadget = null; pageHoverTimer.Stop();
                 foreach (var marker in insertionMarkers) marker.Visibility = Visibility.Collapsed;
                 if (!dropCommitted) { state.PageIndex = dragStartPage; ApplyGadgetPage(); }
                 QueueAutoHide();
             };
-            layout.Children.Add(grip); gadget.Child = layout;
+            gadget.Child = layout;
             layout.Children.Add(insertion);
             gadget.AllowDrop = true;
             gadget.DragOver += (_, args) =>
@@ -83,7 +81,7 @@ public partial class MainWindow
                 dropCommitted = true; Save();
             };
         }
-        MonthText.Margin = new Thickness(0, 0, 24, 0);
+
         ConfigurePageDrop(PreviousPage, -1);
         ConfigurePageDrop(NextPage, 1);
         pageHoverTimer.Tick += (_, _) =>

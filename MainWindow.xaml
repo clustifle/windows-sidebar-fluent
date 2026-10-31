@@ -6,12 +6,11 @@
   </Grid.Resources>
   <Grid.RowDefinitions><RowDefinition Height="0"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0"><StackPanel x:Name="GadgetStack" Spacing="12">
-  <Border x:Name="ClockGadget" Padding="0,4,0,12" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,0,0,1" DoubleTapped="Clock_DoubleTapped"><StackPanel Spacing="4" HorizontalAlignment="Center">
+  <Border x:Name="ClockGadget" Style="{StaticResource GadgetTile}" DoubleTapped="Clock_DoubleTapped"><StackPanel Spacing="4" HorizontalAlignment="Center">
    <Viewbox x:Name="ClockView" Width="96" Height="96"><Canvas x:Name="ClockFace" Width="156" Height="156" AutomationProperties.Name="Analog clock"/></Viewbox>
    <TextBlock x:Name="TimeText" FontSize="24" FontWeight="SemiLight" HorizontalAlignment="Center"/>
    <TextBlock x:Name="DateText" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="190"/>
    <TextBlock x:Name="ClockCaption" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextWrapping="Wrap" MaxWidth="190"/>
-   <Button Click="CustomizeClock_Click" AutomationProperties.Name="Customize clock" ToolTipService.ToolTip="Customize clock" HorizontalAlignment="Center" Background="Transparent" BorderThickness="0" Padding="4"><FontIcon Glyph="&#xE713;" FontSize="12"/></Button>
   </StackPanel></Border>
 
    <Border x:Name="CalendarGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8">
@@ -55,13 +54,13 @@
     <TextBlock x:Name="PuzzleStatus" Text="Choose a picture or play with numbers" TextWrapping="Wrap" FontSize="11"/>
     <StackPanel Orientation="Horizontal" Spacing="6"><Button Click="PuzzleShuffle_Click" Content="Shuffle" Padding="8,4"/><Button Click="ChoosePuzzlePicture_Click" Content="Picture" Padding="8,4"/></StackPanel>
    </StackPanel></Border>
-   <Border x:Name="FeedsGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><Grid><TextBlock Text="Feed headlines" FontWeight="SemiBold"/><Button Click="ConfigureFeed_Click" Content="Edit" FontSize="11" HorizontalAlignment="Right" Margin="0,0,24,0" Padding="4" Background="Transparent" BorderThickness="0"/></Grid>
+   <Border x:Name="FeedsGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><Grid><TextBlock Text="Feed headlines" FontWeight="SemiBold"/><Button Click="ConfigureFeed_Click" Content="Edit" FontSize="11" HorizontalAlignment="Right"  Padding="4" Background="Transparent" BorderThickness="0"/></Grid>
     <TextBlock x:Name="FeedStatus" Text="Add an RSS or Atom feed" TextWrapping="Wrap" FontSize="11"/>
     <StackPanel x:Name="FeedItems" Spacing="6"/>
     <Button Click="RefreshFeed_Click" Content="Refresh" Padding="8,4" HorizontalAlignment="Left"/>
    </StackPanel></Border>
    <Border x:Name="LaunchCategory" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8">
-    <Grid><TextBlock Text="Quick launch" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Click="CustomizeLaunch_Click" Content="Edit" FontSize="11" HorizontalAlignment="Right" Margin="0,0,24,0" Padding="4" Background="Transparent" BorderThickness="0"/></Grid>
+    <Grid><TextBlock Text="Quick launch" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Click="CustomizeLaunch_Click" Content="Edit" FontSize="11" HorizontalAlignment="Right"  Padding="4" Background="Transparent" BorderThickness="0"/></Grid>
     <StackPanel x:Name="LaunchItems" Spacing="4"/>
    </StackPanel></Border>
   </StackPanel></ScrollViewer>

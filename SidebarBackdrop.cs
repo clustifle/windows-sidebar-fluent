@@ -15,6 +15,13 @@ public sealed class SidebarBackdrop : SystemBackdrop
 
     public SidebarBackdrop(bool mica) => this.mica = mica;
     public bool UsesMica => mica;
+    private ElementTheme theme = ElementTheme.Light;
+    public SystemBackdropTheme AppliedTheme => configuration?.Theme ?? SystemBackdropTheme.Default;
+    public void SetTheme(ElementTheme value)
+    {
+        theme = value;
+        if (configuration is not null) configuration.Theme = value == ElementTheme.Dark ? SystemBackdropTheme.Dark : SystemBackdropTheme.Light;
+    }
 
     protected override void OnTargetConnected(ICompositionSupportsSystemBackdrop target, XamlRoot root)
     {
@@ -37,17 +44,18 @@ public sealed class SidebarBackdrop : SystemBackdrop
 
     protected override void OnDefaultSystemBackdropConfigurationChanged(ICompositionSupportsSystemBackdrop target, XamlRoot root)
     {
-        base.OnDefaultSystemBackdropConfigurationChanged(target, root);
+        // The base callback can reject a stale target during a theme transition.
+        // Our controller configuration is owned here and never queries that target.
         UpdateConfiguration(target, root);
     }
 
     private void UpdateConfiguration(ICompositionSupportsSystemBackdrop target, XamlRoot root)
     {
         if (configuration is null) return;
-        var defaults = GetDefaultSystemBackdropConfiguration(target, root);
-        configuration.Theme = defaults.Theme;
-        configuration.IsHighContrast = defaults.IsHighContrast;
-        configuration.HighContrastBackgroundColor = defaults.HighContrastBackgroundColor;
+        var accessibility = new Windows.UI.ViewManagement.AccessibilitySettings();
+        configuration.Theme = theme == ElementTheme.Dark ? SystemBackdropTheme.Dark : SystemBackdropTheme.Light;
+        configuration.IsHighContrast = accessibility.HighContrast;
+        configuration.HighContrastBackgroundColor = new Windows.UI.ViewManagement.UISettings().GetColorValue(Windows.UI.ViewManagement.UIColorType.Background);
         configuration.IsInputActive = true;
     }
 

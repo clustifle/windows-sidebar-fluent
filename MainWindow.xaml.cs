@@ -105,6 +105,7 @@ public partial class MainWindow : Window
         bool useMica = state.Material == "Mica";
         if (SystemBackdrop is not SidebarBackdrop backdrop || backdrop.UsesMica != useMica)
             SystemBackdrop = new SidebarBackdrop(useMica);
+        ((SidebarBackdrop)SystemBackdrop).SetTheme(Root.RequestedTheme);
         ClockGadget.Visibility = state.Clock ? Visibility.Visible : Visibility.Collapsed;
         ClockView.Visibility = state.ClockStyle == "Digital" ? Visibility.Collapsed : Visibility.Visible;
         TimeText.Visibility = state.ClockStyle == "Analog" ? Visibility.Collapsed : Visibility.Visible;
@@ -149,10 +150,14 @@ public partial class MainWindow : Window
             "Dark" => ElementTheme.Dark,
             _ => (background.R * 299 + background.G * 587 + background.B * 114) >= 128000 ? ElementTheme.Light : ElementTheme.Dark
         };
+        if (SystemBackdrop is SidebarBackdrop railBackdrop) railBackdrop.SetTheme(requestedTheme);
         if (Root.RequestedTheme != requestedTheme) Root.RequestedTheme = requestedTheme;
+        Root.Background = SurfaceBrush(requestedTheme, 128);
+        if (preferencesWindow?.SystemBackdrop is SidebarBackdrop settingsBackdrop) settingsBackdrop.SetTheme(requestedTheme);
         if (preferencesWindow?.Content is FrameworkElement preferencesRoot)
         {
             if (preferencesRoot.RequestedTheme != requestedTheme) preferencesRoot.RequestedTheme = requestedTheme;
+            if (preferencesRoot is Panel preferencesPanel) preferencesPanel.Background = SurfaceBrush(requestedTheme, 224);
             preferencesWindow.AppWindow.TitleBar.ButtonForegroundColor = Root.RequestedTheme == ElementTheme.Dark ? Colors.White : Colors.Black;
             preferencesWindow.AppWindow.TitleBar.ButtonInactiveForegroundColor = Root.RequestedTheme == ElementTheme.Dark ? Colors.LightGray : Colors.DimGray;
         }
@@ -162,6 +167,14 @@ public partial class MainWindow : Window
         DwmSetWindowAttribute(hwnd, 34, ref noBorder, sizeof(uint)); // DWMWA_BORDER_COLOR
         uint squareCorners = 1; // DWMWCP_DONOTROUND: the rail meets the screen edge.
         DwmSetWindowAttribute(hwnd, 33, ref squareCorners, sizeof(uint));
+    }
+
+    private Brush SurfaceBrush(ElementTheme theme, byte opacity)
+    {
+        if (new AccessibilitySettings().HighContrast)
+            return new SolidColorBrush(windowsAppearance.GetColorValue(UIColorType.Background));
+        byte shade = theme == ElementTheme.Dark ? (byte)32 : (byte)243;
+        return new SolidColorBrush(Windows.UI.Color.FromArgb(opacity, shade, shade, shade));
     }
 
     private void PositionSidebar()
@@ -268,13 +281,17 @@ public partial class MainWindow : Window
     private void BuildClockFace()
     {
         ClockFace.Children.Clear();
-        var ink = TimeText.Foreground;
-        var secondary = DateText.Foreground;
+        bool ivory = state.ClockFaceStyle == "Ivory";
+        bool midnight = state.ClockFaceStyle == "Midnight";
+        Brush ink = ivory ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 58, 49, 37)) : midnight ? new SolidColorBrush(Colors.White) : TimeText.Foreground;
+        if (ivory || midnight)
+            ClockFace.Children.Add(new Ellipse { Width = 156, Height = 156, Fill = new SolidColorBrush(ivory ? Windows.UI.Color.FromArgb(255, 247, 238, 215) : Windows.UI.Color.FromArgb(255, 22, 35, 57)) });
+        var secondary = ivory || midnight ? ink : DateText.Foreground;
         for (int i = 0; i < 60; i++)
         {
             double a = i * Math.PI / 30;
             double r = i % 5 == 0 ? 63 : 68;
-            ClockFace.Children.Add(new Line { X1 = 78 + Math.Sin(a) * r, Y1 = 78 - Math.Cos(a) * r, X2 = 78 + Math.Sin(a) * 72, Y2 = 78 - Math.Cos(a) * 72, Stroke = secondary, StrokeThickness = i % 5 == 0 ? 2 : 1 });
+            ClockFace.Children.Add(new Line { X1 = 78 + Math.Sin(a) * r, Y1 = 78 - Math.Cos(a) * r, X2 = 78 + Math.Sin(a) * 72, Y2 = 78 - Math.Cos(a) * 72, Stroke = secondary, StrokeThickness = i % 5 == 0 ? (state.ClockFaceStyle == "Railway" ? 4 : 2) : 1 });
         }
         hourRotation = Hand(40, 4, ink);
         minuteRotation = Hand(57, 3, ink);
@@ -453,7 +470,7 @@ public partial class MainWindow : Window
         if (dialogOpen) return;
         dialogOpen = true;
         var completion = new TaskCompletionSource<bool>();
-        var window = new Window { Title = $"Windows Sidebar Fluent — {title}", SystemBackdrop = new MicaBackdrop() };
+        var window = new Window { Title = $"Windows Sidebar Fluent — {title}", SystemBackdrop = new SidebarBackdrop(true) };
         window.AppWindow.IsShownInSwitchers = false;
         preferencesWindow = window;
         var layout = new Grid { Padding = new Thickness(24), RowSpacing = 20 };
@@ -466,6 +483,7 @@ public partial class MainWindow : Window
         var done = new Button { Content = "Done", HorizontalAlignment = HorizontalAlignment.Right };
         done.Click += (_, _) => window.Close(); Grid.SetRow(done, 2); layout.Children.Add(done);
         var windowRoot = new Grid { RequestedTheme = Root.RequestedTheme };
+        windowRoot.Background = SurfaceBrush(Root.RequestedTheme, 224);
         windowRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         windowRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         var titleBar = new TitleBar { Title = "Windows Sidebar Fluent" };

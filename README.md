@@ -13,7 +13,7 @@ Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica
 ## Using the sidebar
 
 - Use the small previous/next buttons to change gadget pages; **+** opens the gadget manager.
-- Drag a gadget by its grip to reorder it, including the clock. Hold over a page arrow to move between pages.
+- Drag a gadget by its card background or heading to reorder it, including the clock. Hold over a page arrow to move between pages.
 - Right-click for Settings, gadget selection, clock and Quick Launch customization, startup, and Exit.
 - The app stays out of the taskbar and Alt+Tab. Its tray icon may appear in the Windows tray overflow.
 - Settings offer Light, Dark, or System theme; Acrylic/Mica; width; left/right docking; and optional animated auto-hide.
@@ -23,7 +23,7 @@ Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica
 
 | Gadget | Features |
 | --- | --- |
-| Clock | Minimal, Classic, and Roman faces; analog/digital; size; time zone; 12/24-hour time; date, seconds, second hand, and label |
+| Clock | Minimal, Classic, Roman, Railway, Midnight, and Ivory faces; analog/digital; size; time zone; 12/24-hour time; date, seconds, second hand, and label |
 | Calendar | Month navigation and Today |
 | Notes | Local autosave and adjustable height |
 | CPU meter | CPU and physical-memory gauges |
@@ -71,4 +71,4 @@ Local checks cover repeated Light/Dark/System changes through the settings selec
 
 MIT. See [LICENSE](LICENSE). Microsoft Fluent System Icons artwork is separately attributed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Theme regression: publish with `-p:DefineConstants=THEME_REGRESSION` to a separate test folder and run that build with no other Sidebar instance open. It cycles the settings selector six times, checks actual themes and gadget identity, restores the original theme, and writes `theme-test-result.txt` beside the test executable. Normal builds exclude this test.
+Theme regression: publish with `-p:DefineConstants=THEME_REGRESSION` to a separate test folder and run that build with no other Sidebar instance open. It cycles the settings selector 24 times across Acrylic and Mica, checks content/backdrop themes, settings contrast, and gadget identity, restores the original theme, and writes `theme-test-result.txt` beside the test executable. Normal builds exclude this test.
