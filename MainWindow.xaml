@@ -48,7 +48,7 @@
     <TextBlock x:Name="MemoryText" FontSize="11" TextWrapping="Wrap"/><ProgressBar x:Name="MemoryBar" Maximum="100" Visibility="Collapsed"/>
    </StackPanel></Border>
    <Border x:Name="SlideShowGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="Slide show" FontWeight="SemiBold"/>
-    <Grid Height="130" Background="{ThemeResource SubtleFillColorSecondaryBrush}"><Image x:Name="SlideImage" Stretch="UniformToFill"/><TextBlock x:Name="SlideHint" Text="Choose a picture folder" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12"/></Grid>
+    <Grid x:Name="SlideImageFrame" Height="130" Background="{ThemeResource SubtleFillColorSecondaryBrush}"><Image x:Name="SlideImage" Stretch="UniformToFill"/><TextBlock x:Name="SlideHint" Text="Choose a picture folder" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="12"/></Grid>
     <TextBlock x:Name="SlideName" FontSize="11" TextTrimming="CharacterEllipsis"/>
     <Grid ColumnSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition/></Grid.ColumnDefinitions>
      <Button Click="SlidePrevious_Click" AutomationProperties.Name="Previous picture" Padding="6"><FontIcon Glyph="&#xE76B;" FontSize="12"/></Button>

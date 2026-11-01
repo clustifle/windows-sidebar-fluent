@@ -50,7 +50,7 @@ public partial class MainWindow
         ApplyLauncherEntry();
         Root.Padding = state.LonghornMode ? new Thickness(5, 3, 5, 4) : new Thickness(10, 8, 10, 10);
         Root.RowSpacing = state.LonghornMode ? 3 : 8;
-        GadgetStack.Spacing = state.LonghornMode ? 0 : 12;
+        GadgetStack.Spacing = state.LonghornMode ? 0 : state.AppearancePreset == "Vista" ? 18 : 14;
         GadgetScroller.Padding = state.LonghornMode ? new Thickness(0) : new Thickness(0, 0, 4, 0);
         MonthText.FontSize = state.LonghornMode ? 13 : 16;
         DateText.FontSize = state.LonghornMode ? 11 : 12;

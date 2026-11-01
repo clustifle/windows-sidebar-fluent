@@ -76,12 +76,12 @@ internal sealed class DesktopAppBar : IDisposable
         var data = Data();
         registered = SHAppBarMessage(AbmNew, ref data) != UIntPtr.Zero;
         hasPosition = false;
-        if (!registered) throw new InvalidOperationException("Windows could not reserve space for Sidebar.");
     }
 
     private void Position()
     {
-        if (disposed || !registered || positioning) return;
+        if (disposed || positioning) return;
+        if (!registered) { PositionWithoutReservation(); return; }
         positioning = true;
         try
         {
@@ -124,6 +124,28 @@ internal sealed class DesktopAppBar : IDisposable
             if (!GetWindowRect(hwnd, out var actual) || !actual.Equals(windowRect))
                 SetWindowPos(hwnd, IntPtr.Zero, windowRect.Left, windowRect.Top,
                     windowRect.Right - windowRect.Left, windowRect.Bottom - windowRect.Top, 0x0004 | 0x0010);
+        }
+        finally { positioning = false; }
+    }
+
+    private void PositionWithoutReservation()
+    {
+        if (positioning) return;
+        positioning = true;
+        try
+        {
+            var monitor = new MonitorInfo { Size = (uint)Marshal.SizeOf<MonitorInfo>() };
+            if (!GetMonitorInfo(MonitorFromWindow(hwnd, 2), ref monitor)) return;
+            uint dpi = Math.Max(96u, GetDpiForWindow(hwnd));
+            int fullWidth = (int)Math.Round(logicalWidth * dpi / 96d);
+            int edgeWidth = autoHide ? Math.Max(3, (int)Math.Round(3 * dpi / 96d)) : fullWidth;
+            int visibleWidth = autoHide ? edgeWidth + (int)Math.Round((fullWidth - edgeWidth) * revealProgress) : fullWidth;
+            var bounds = monitor.Monitor;
+            if (left) bounds.Right = bounds.Left + visibleWidth;
+            else bounds.Left = bounds.Right - visibleWidth;
+            if (!GetWindowRect(hwnd, out var actual) || !actual.Equals(bounds))
+                SetWindowPos(hwnd, IntPtr.Zero, bounds.Left, bounds.Top, bounds.Right - bounds.Left,
+                    bounds.Bottom - bounds.Top, 0x0004 | 0x0010);
         }
         finally { positioning = false; }
     }

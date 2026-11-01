@@ -41,7 +41,8 @@ public partial class MainWindow
             if (!slidePaused && slideFiles.Length > 1) slideTimer.Start(); else slideTimer.Stop();
         }
         else slideTimer.Stop();
-        if (IsGadgetOnScreen(PuzzleGadget) && (!puzzleRendered || puzzleRenderWidth != SidebarWidth || renderedPuzzleRail != state.LonghornMode || loadedPuzzleKey != PuzzleImageKey || renderedPuzzleLabels != state.PuzzleNumberLabels))
+        int puzzleWidth = (int)Math.Round(PuzzleGadget.ActualWidth > 30 ? PuzzleGadget.ActualWidth : SidebarWidth);
+        if (IsGadgetOnScreen(PuzzleGadget) && (!puzzleRendered || puzzleRenderWidth != puzzleWidth || renderedPuzzleRail != state.LonghornMode || loadedPuzzleKey != PuzzleImageKey || renderedPuzzleLabels != state.PuzzleNumberLabels))
         {
             RenderPuzzle();
         }

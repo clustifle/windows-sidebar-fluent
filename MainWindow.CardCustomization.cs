@@ -31,7 +31,7 @@ public partial class MainWindow
             var style = CardStyle(id); var card = (Border)GadgetElement(id);
             if (style.Height > 0) card.Height = Math.Clamp(style.Height, 80, 600);
             if (style.Padding >= 0) card.Padding = new Thickness(Math.Clamp(style.Padding, 0, 24));
-            else card.Padding = state.LonghornMode ? new Thickness(4, 8, 4, 8) : new Thickness(12);
+            else card.Padding = state.LonghornMode ? new Thickness(4, 8, 4, 8) : state.AppearancePreset == "Vista" ? new Thickness(18) : new Thickness(14);
             card.CornerRadius = new CornerRadius(style.CornerRadius >= 0 ? Math.Clamp(style.CornerRadius, 0, 24) : state.LonghornMode ? 0 : 8);
             if (new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast) card.Background = SurfaceBrush(Root.RequestedTheme, 255);
             else if (style.BackgroundOpacity >= 0) card.Background = SurfaceBrush(Root.RequestedTheme, (byte)(Math.Clamp(style.BackgroundOpacity, 0, 100) * 255 / 100));

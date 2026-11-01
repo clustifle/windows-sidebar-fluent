@@ -108,8 +108,9 @@ public partial class MainWindow
     {
         if (sidebarClosed || closing) return;
         EnsurePuzzlePicture();
-        puzzleRenderWidth = SidebarWidth; renderedPuzzleRail = state.LonghornMode;
-        double available = Math.Clamp(SidebarWidth - (state.LonghornMode ? 24 : 48), 100, 260);
+        int cardWidth = (int)Math.Round(PuzzleGadget.ActualWidth > 30 ? PuzzleGadget.ActualWidth : SidebarWidth);
+        puzzleRenderWidth = cardWidth; renderedPuzzleRail = state.LonghornMode;
+        double available = Math.Clamp(cardWidth - (state.LonghornMode ? 24 : 48), 100, 320);
         if (PuzzleFrame.ActualWidth > 30) available = Math.Min(available, PuzzleFrame.ActualWidth - 6);
         double scale = Root.XamlRoot?.RasterizationScale ?? 1;
         double cell = Math.Max(8, Math.Floor((available - 4) / 3 * scale) / scale), size = cell * 3 + 4;

@@ -65,7 +65,13 @@ public partial class MainWindow : Window
         UpdateTimerInterval();
         timer.Start();
         Activated += (_, _) => SynchronizeAppearance();
-        Closed += (_, _) => { closing = true; preferencesWindow?.Close(); windowsAppearance.ColorValuesChanged -= WindowsAppearance_Changed; trayIcon?.Dispose(); appBar?.Dispose(); timer.Stop(); saveTimer.Stop(); Save(); };
+        Closed += (_, _) =>
+        {
+            closing = true; preferencesWindow?.Close(); windowsAppearance.ColorValuesChanged -= WindowsAppearance_Changed;
+            foreach (var detached in desktopGadgets.Values.ToArray()) detached.CloseFromOwner();
+            desktopGadgets.Clear();
+            trayIcon?.Dispose(); appBar?.Dispose(); timer.Stop(); saveTimer.Stop(); Save();
+        };
     }
 
     public void AttachToDesktop()
@@ -88,6 +94,7 @@ public partial class MainWindow : Window
         PositionSidebar();
         ApplyAutoHidePreference();
         InitializeLonghorn();
+        RestoreDesktopGadgets();
     }
 
     private void HideFromTaskSwitchers()
@@ -125,13 +132,17 @@ public partial class MainWindow : Window
         LonghornClockDock.Children.Clear();
         GadgetStack.Children.Clear();
         foreach (var id in ActiveGadgetOrder)
+        {
+            if (state.DesktopGadgets.ContainsKey(id)) continue;
             if (state.LonghornMode && state.LonghornBottomClock && id == "Clock") LonghornClockDock.Children.Add(ClockGadget);
             else GadgetStack.Children.Add(GadgetElement(id));
+        }
         ApplyGadgetPage();
         ClockView.Width = ClockView.Height = state.CompactClock ? 80 : 120;
         ApplyClockPreferences();
         ApplyGadgetSizes();
         ApplyCardCustomizations();
+        UpdateDesktopGadgets();
         PositionSidebar();
         ApplyAutoHidePreference();
         UpdateTimerInterval();
@@ -168,6 +179,7 @@ public partial class MainWindow : Window
         };
         if (SystemBackdrop is SidebarBackdrop railBackdrop) railBackdrop.SetTheme(requestedTheme);
         if (Root.RequestedTheme != requestedTheme) Root.RequestedTheme = requestedTheme;
+        UpdateDetachedAppearance(requestedTheme);
         if (launcherSurface is not null && launcherSurface.RequestedTheme != requestedTheme) launcherFlyout?.Hide();
         Root.Background = RailSurfaceBrush(requestedTheme);
         ApplyLonghornVisuals();
@@ -243,6 +255,7 @@ public partial class MainWindow : Window
         bool migrate = state.LayoutVersion < 3;
         state.GadgetOrder = (state.GadgetOrder ?? []).Where(known.Contains).Concat(known).Distinct().ToList();
         state.LonghornGadgetOrder = (state.LonghornGadgetOrder ?? []).Where(known.Contains).Concat(known).Distinct().ToList();
+        state.DesktopGadgets ??= new(StringComparer.OrdinalIgnoreCase);
         if (migrate && state.GadgetOrder.Count > 1 && state.GadgetOrder[0] == "Clock")
         {
             state.GadgetOrder.RemoveAt(0);
@@ -254,13 +267,14 @@ public partial class MainWindow : Window
 
     private void ApplyGadgetPage()
     {
-        foreach (var id in ActiveGadgetOrder) GadgetElement(id).Visibility = Visibility.Collapsed;
-        var enabled = ActiveGadgetOrder.Where(id => GadgetEnabled(id) && !(state.LonghornMode && (id == "Quick launch" || (id == "Clock" && state.LonghornBottomClock)))).ToArray();
+        foreach (var id in ActiveGadgetOrder) if (!state.DesktopGadgets.ContainsKey(id)) GadgetElement(id).Visibility = Visibility.Collapsed;
+        var enabled = ActiveGadgetOrder.Where(id => GadgetEnabled(id) && !state.DesktopGadgets.ContainsKey(id) && !(state.LonghornMode && (id == "Quick launch" || (id == "Clock" && state.LonghornBottomClock)))).ToArray();
         int density = Math.Clamp(state.GadgetsPerPage, 1, 3);
         int pages = Math.Max(1, (enabled.Length + density - 1) / density);
         state.PageIndex = Math.Clamp(state.PageIndex, 0, pages - 1);
         foreach (var id in state.LonghornMode ? enabled : enabled.Skip(state.PageIndex * density).Take(density)) GadgetElement(id).Visibility = Visibility.Visible;
-        if (state.LonghornMode && state.LonghornBottomClock && state.Clock) ClockGadget.Visibility = Visibility.Visible;
+        if (!state.DesktopGadgets.ContainsKey("Clock") && state.LonghornMode && state.LonghornBottomClock && state.Clock) ClockGadget.Visibility = Visibility.Visible;
+        UpdateDesktopGadgets();
         PageIndicator.Text = enabled.Length == 0 ? "No gadgets" : $"{state.PageIndex + 1} / {pages}";
         PreviousPage.IsEnabled = state.PageIndex > 0;
         NextPage.IsEnabled = state.PageIndex < pages - 1;
@@ -279,7 +293,7 @@ public partial class MainWindow : Window
 
     private void UpdateGadgets()
     {
-        if (state.AutoHide && autoHidden) { UpdateDesktopStatus(); UpdateTimerInterval(); return; }
+        if (state.AutoHide && autoHidden && desktopGadgets.Count == 0) { UpdateDesktopStatus(); UpdateTimerInterval(); return; }
         var now = DateTime.Now;
         if (IsGadgetOnScreen(ClockGadget))
         {
@@ -343,7 +357,7 @@ public partial class MainWindow : Window
     private void UpdateTimerInterval()
     {
         double seconds = 30;
-        if (!(state.AutoHide && autoHidden))
+        if (!(state.AutoHide && autoHidden) || desktopGadgets.Count > 0)
         {
             if (IsGadgetOnScreen(ClockGadget)) seconds = state.ShowSeconds || (state.ClockStyle != "Digital" && state.ClockSecondHand) ? 1 : Math.Max(1, 60 - DateTime.Now.Second);
             if (IsGadgetOnScreen(SystemGadget)) seconds = Math.Min(seconds, Math.Clamp(state.PerformanceInterval, 1, 10));
@@ -697,8 +711,8 @@ public sealed class SidebarState
     public string Notes { get; set; } = "";
     public string Material { get; set; } = "Acrylic";
     public string Theme { get; set; } = "System";
-    public int Width { get; set; } = 240;
-    public bool CompactClock { get; set; } = true;
+    public int Width { get; set; } = 280;
+    public bool CompactClock { get; set; }
     public bool LonghornMode { get; set; }
     public bool LonghornHideTaskbar { get; set; }
     public bool LonghornHideSystemTray { get; set; }
@@ -709,6 +723,7 @@ public sealed class SidebarState
     public bool LonghornShowPins { get; set; } = true;
     public bool LonghornTrayExpanded { get; set; }
     public Dictionary<string, GadgetCardStyle> CardStyles { get; set; } = new();
+    public Dictionary<string, DesktopGadgetPlacement> DesktopGadgets { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool CalendarAdjacentDays { get; set; } = true;
     public string CalendarFirstDay { get; set; } = "System";
     public bool CalendarTodayButton { get; set; } = true;
@@ -765,6 +780,14 @@ public sealed class SidebarState
     public int[]? PuzzleTiles { get; set; }
     public int PuzzleMoves { get; set; }
     public string FeedUrl { get; set; } = "";
+}
+
+public sealed class DesktopGadgetPlacement
+{
+    public int X { get; set; }
+    public int Y { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
 }
 
 internal static class ResourceExtensions

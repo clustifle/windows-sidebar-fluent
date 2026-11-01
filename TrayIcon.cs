@@ -10,7 +10,7 @@ internal sealed class TrayIcon : IDisposable
     private readonly Func<bool> alwaysOnTop;
     private readonly uint callback = RegisterWindowMessage("ClassicSidebar.Tray.Callback");
     private readonly uint taskbarCreated = RegisterWindowMessage("TaskbarCreated");
-    private bool disposed;
+    private bool disposed, registered;
 
     public TrayIcon(IntPtr hwnd, string iconPath, Action<int> command, Func<bool> alwaysOnTop)
     {
@@ -25,8 +25,14 @@ internal sealed class TrayIcon : IDisposable
     private NotifyIconData Data() => new() { Size = (uint)Marshal.SizeOf<NotifyIconData>(), Window = hwnd, Id = 1, Flags = 1 | 2 | 4, Callback = callback, Icon = icon, Tip = "FluentSidebar — right-click for settings", Info = "", InfoTitle = "" };
     private void Add()
     {
+        if (disposed || registered) return;
         var data = Data();
-        if (!Shell_NotifyIcon(0, ref data)) throw new InvalidOperationException("Windows could not add Sidebar to the notification area.");
+        if (!Shell_NotifyIcon(0, ref data))
+        {
+            System.Diagnostics.Debug.WriteLine("Explorer did not accept Sidebar's notification icon; the sidebar will continue without the tray menu.");
+            return;
+        }
+        registered = true;
         data.Version = 4;
         Shell_NotifyIcon(4, ref data);
     }
@@ -74,7 +80,7 @@ internal sealed class TrayIcon : IDisposable
     {
         if (disposed) return;
         disposed = true;
-        var data = Data(); Shell_NotifyIcon(2, ref data);
+        if (registered) { var data = Data(); Shell_NotifyIcon(2, ref data); registered = false; }
         RemoveWindowSubclass(hwnd, subclass, 2);
         DestroyIcon(icon);
         GC.KeepAlive(subclass);

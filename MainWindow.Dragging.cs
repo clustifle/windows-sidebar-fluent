@@ -10,6 +10,7 @@ public partial class MainWindow
 {
     private const string GadgetDragKey = "WindowsSidebarFluent.Gadget";
     private string? draggingGadget;
+    private Windows.Foundation.Point dragGrabOffset;
     private int dragStartPage, hoverDirection;
     private bool dropCommitted;
     private readonly List<Border> insertionMarkers = [];
@@ -34,6 +35,7 @@ public partial class MainWindow
             bool interactivePress = false;
             gadget.AddHandler(UIElement.PointerPressedEvent, new Microsoft.UI.Xaml.Input.PointerEventHandler((_, args) =>
             {
+                dragGrabOffset = args.GetCurrentPoint(gadget).Position;
                 interactivePress = false;
                 for (DependencyObject? node = args.OriginalSource as DependencyObject; node is not null && node != gadget; node = VisualTreeHelper.GetParent(node))
                     if (node is Microsoft.UI.Xaml.Controls.Primitives.ButtonBase or TextBox or NumberBox or ComboBox or Slider or ToggleSwitch or Microsoft.UI.Xaml.Controls.Primitives.ScrollBar)
@@ -48,8 +50,11 @@ public partial class MainWindow
                 args.Data.RequestedOperation = DataPackageOperation.Move;
                 gadget.Opacity = 0.55;
             };
-            gadget.DropCompleted += (_, _) =>
+            gadget.DropCompleted += (_, args) =>
             {
+                string? source = draggingGadget;
+                if (source is not null && !dropCommitted && args.DropResult == DataPackageOperation.None && GetCursorPos(out var point) && IsDesktopDropTarget(point))
+                    DetachGadgetToDesktop(source, point, dragGrabOffset);
                 gadget.Opacity = 1; draggingGadget = null; pageHoverTimer.Stop();
                 foreach (var marker in insertionMarkers) marker.Visibility = Visibility.Collapsed;
                 if (!dropCommitted) { state.PageIndex = dragStartPage; ApplyGadgetPage(); }
@@ -99,7 +104,20 @@ public partial class MainWindow
             args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true;
             if (state.LonghornMode && source == "Clock") state.LonghornBottomClock = false;
             ActiveGadgetOrder.Remove(source); ActiveGadgetOrder.Add(source);
-            dropCommitted = true; ApplyState(); Save();
+            dropCommitted = true;
+            ApplyState();
+            Save();
+        };
+        Root.AllowDrop = true;
+        Root.DragOver += (_, args) => { if (IsGadgetDrag(args.DataView)) { args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true; } };
+        Root.Drop += (_, args) =>
+        {
+            if (!IsGadgetDrag(args.DataView) || draggingGadget is not string source || args.Handled) return;
+            args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true;
+            ActiveGadgetOrder.Remove(source); ActiveGadgetOrder.Add(source);
+            dropCommitted = true;
+            ApplyState();
+            Save();
         };
         LonghornClockDock.DragOver += (_, args) =>
         {
@@ -113,7 +131,9 @@ public partial class MainWindow
             LonghornClockDock.Background = null;
             if (!state.LonghornMode || draggingGadget != "Clock" || !IsGadgetDrag(args.DataView)) return;
             args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true;
-            state.LonghornBottomClock = true; dropCommitted = true; ApplyState(); Save();
+            state.LonghornBottomClock = true; dropCommitted = true;
+            ApplyState();
+            Save();
         };
         pageHoverTimer.Tick += (_, _) =>
         {
@@ -140,6 +160,13 @@ public partial class MainWindow
         button.DragOver += (_, args) =>
         {
             if (IsGadgetDrag(args.DataView)) { args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true; }
+        };
+        button.Drop += (_, args) =>
+        {
+            if (!IsGadgetDrag(args.DataView) || draggingGadget is not string source) return;
+            args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true; dropCommitted = true;
+            state.PageIndex = Math.Clamp(state.PageIndex + direction, 0, Math.Max(0, (ActiveGadgetOrder.Count - 1) / Math.Clamp(state.GadgetsPerPage, 1, 3))); ApplyGadgetPage();
+            Save();
         };
         button.DragLeave += (_, _) => pageHoverTimer.Stop();
     }

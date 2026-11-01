@@ -6,6 +6,8 @@ public partial class MainWindow
 {
     private bool IsGadgetOnScreen(FrameworkElement gadget)
     {
+        string? floatingId = ActiveGadgetOrder.FirstOrDefault(id => ReferenceEquals(GadgetElement(id), gadget));
+        if (floatingId is not null && state.DesktopGadgets.ContainsKey(floatingId)) return GadgetEnabled(floatingId);
         if (gadget.Visibility != Visibility.Visible || (state.AutoHide && autoHidden)) return false;
         if (!ready || gadget.ActualHeight <= 0) return true;
         try
