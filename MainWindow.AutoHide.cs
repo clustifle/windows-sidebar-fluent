@@ -31,14 +31,14 @@ public partial class MainWindow
         hideTimer.Tick += (_, _) =>
         {
             hideTimer.Stop();
-            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && !LonghornSearch.IsSuggestionListOpen && puzzlePopup?.IsOpen != true && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
+            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && !LonghornSearch.IsSuggestionListOpen && puzzlePopup?.IsOpen != true && launcherFlyout?.IsOpen != true && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
         };
         revealTimer.Tick += (_, _) => AdvanceReveal();
         desktopRecoveryTimer.Tick += (_, _) => { desktopRecoveryTimer.Stop(); UpdateDesktopVisibility(); };
         foregroundCallback = (_, _, _, _, _, _, _) => DispatcherQueue.TryEnqueue(QueueDesktopVisibilityCheck);
         foregroundHook = SetWinEventHook(3, 3, IntPtr.Zero, foregroundCallback, 0, 0, 0);
         UpdateDesktopVisibility();
-        Closed += (_, _) => { sidebarClosed = true; revealGeneration++; hideTimer.Stop(); revealTimer.Stop(); desktopRecoveryTimer.Stop(); if (foregroundHook != IntPtr.Zero) UnhookWinEvent(foregroundHook); };
+        Closed += (_, _) => { sidebarClosed = true; launcherFlyout?.Hide(); revealGeneration++; hideTimer.Stop(); revealTimer.Stop(); desktopRecoveryTimer.Stop(); if (foregroundHook != IntPtr.Zero) UnhookWinEvent(foregroundHook); };
     }
 
     private void ApplyAutoHidePreference()
@@ -51,7 +51,7 @@ public partial class MainWindow
 
     private void QueueAutoHide()
     {
-        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || LonghornSearch.IsSuggestionListOpen || puzzlePopup?.IsOpen == true || draggingGadget is not null) return;
+        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || LonghornSearch.IsSuggestionListOpen || puzzlePopup?.IsOpen == true || launcherFlyout?.IsOpen == true || draggingGadget is not null) return;
         hideTimer.Stop(); hideTimer.Start();
     }
 
@@ -66,7 +66,7 @@ public partial class MainWindow
 
     private void HideSidebar()
     {
-        if (autoHidden || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive) return;
+        if (autoHidden || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || launcherFlyout?.IsOpen == true) return;
         autoHidden = true; slideTimer.Stop(); UpdateTimerInterval(); BeginReveal(0);
     }
 
@@ -127,6 +127,7 @@ public partial class MainWindow
         requestedLeft = left;
         LonghornSearch.IsSuggestionListOpen = false;
         puzzlePopup?.Hide();
+        launcherFlyout?.Hide();
         if (sideMoveRunning || sidebarClosed) return;
         sideMoveRunning = true;
         hideTimer.Stop(); revealTimer.Stop(); currentReveal = revealFrom = revealTo = 1; revealGeneration++;

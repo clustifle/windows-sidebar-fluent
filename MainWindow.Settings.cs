@@ -27,7 +27,7 @@ public partial class MainWindow
         theme.SelectionChanged += (_, _) => { if (theme.SelectedItem is not string selected || state.Theme == selected) return; state.Theme = selected; SynchronizeAppearance(); QueueAppearanceRefresh(); Save(); }; appearance.Children.Add(theme);
         var material = new ComboBox { Header = "Material", ItemsSource = new[] { "Acrylic", "Mica" }, SelectedItem = state.Material, HorizontalAlignment = HorizontalAlignment.Stretch };
         material.SelectionChanged += (_, _) => { if (material.SelectedItem is not string selected || state.Material == selected) return; state.Material = selected; ApplyState(); Save(); }; appearance.Children.Add(material);
-        Number(appearance, "Normal sidebar width", 220, 360, state.Width, value => state.Width = value);
+        Number(appearance, "Normal sidebar width", 220, 360, state.Width, value => { state.Width = value; RefreshQuickLaunch(); });
         var gadgets = Section("Gadgets");
         gadgets.Children.Add(new TextBlock { Text = "Expand a gadget to customize its content and locked card appearance. Changes save automatically.", TextWrapping = TextWrapping.Wrap, FontSize = 12 });
         Number(gadgets, "Gadgets per page (normal mode)", 1, 3, state.GadgetsPerPage, value => state.GadgetsPerPage = value);
@@ -42,9 +42,11 @@ public partial class MainWindow
         var longhorn = new ToggleSwitch { Header = "Longhorn mode", IsOn = state.LonghornMode };
         longhornModeSwitch = longhorn;
         longhorn.Toggled += async (_, _) => { if (longhorn.IsOn == state.LonghornMode) return; longhorn.IsEnabled = false; try { state.LonghornMode = longhorn.IsOn; state.AppearancePreset = longhorn.IsOn ? "Longhorn 4074" : "Fluent"; preset.SelectedItem = state.AppearancePreset; styledLonghorn = null; await UpdateLonghornAsync(); Save(); } finally { longhorn.IsEnabled = true; } }; longhornPanel.Children.Add(longhorn);
-        Number(longhornPanel, "Rail width", 156, 280, state.LonghornWidth, value => state.LonghornWidth = value);
+        Number(longhornPanel, "Rail width", 156, 280, state.LonghornWidth, value => { state.LonghornWidth = value; RefreshQuickLaunch(); });
         AddToggle(longhornPanel, "Dock clock at the bottom", state.LonghornBottomClock, value => state.LonghornBottomClock = value);
         AddToggle(longhornPanel, "Show pinned launchers", state.LonghornShowPins, value => { state.LonghornShowPins = value; ApplyLonghornSections(); });
+        Number(longhornPanel, "Pinned icon size", 16, 28, state.LonghornPinIconSize, value => { state.LonghornPinIconSize = value; RefreshQuickLaunch(); });
+        Number(longhornPanel, "Pinned rows", 1, 3, state.LonghornPinRows, value => { state.LonghornPinRows = value; RefreshQuickLaunch(); });
         longhornPanel.Children.Add(new TextBlock { Text = "Longhorn mode keeps the original Windows taskbar visible, including Start, apps, Quick Settings, notifications, clock, and input controls. The rail contains search, pinned launchers, and gadgets.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         var behavior = Section("Behavior");
         AddToggle(behavior, "Auto-hide at screen edge", state.AutoHide, value => state.AutoHide = value);
@@ -53,7 +55,7 @@ public partial class MainWindow
         side.Toggled += async (_, _) => { if (side.IsOn != state.Left) await MoveSidebarAsync(side.IsOn); }; behavior.Children.Add(side);
         AddToggle(behavior, "Keep above other windows", state.AlwaysOnTop, value => state.AlwaysOnTop = value);
         AddToggle(behavior, "Start with Windows", StartupPreference.Enabled, SetStartup);
-        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 2.0.0. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 2.0.1. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         return tabs;
     }
     private void ActivatePreferences()

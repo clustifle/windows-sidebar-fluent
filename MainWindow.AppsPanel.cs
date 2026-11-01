@@ -16,7 +16,7 @@ public partial class MainWindow
     {
         if (root.DataContext is not InstalledApp app || root.FindName("SearchIcon") is not Image icon || root.FindName("SearchFallback") is not FontIcon fallback) return;
         ToolTipService.SetToolTip(root, app.Name);
-        icon.Source = null; icon.Visibility = Visibility.Collapsed; fallback.Visibility = Visibility.Visible; fallback.Glyph = "\uE8A5"; root.IsHitTestVisible = !string.IsNullOrEmpty(app.Target);
+        icon.Source = null; icon.Visibility = Visibility.Collapsed; fallback.Visibility = Visibility.Visible; fallback.Glyph = IsWebsite(app.Target) ? "\uE774" : "\uE71D"; root.IsHitTestVisible = !string.IsNullOrEmpty(app.Target);
         if (string.IsNullOrEmpty(app.Target)) { fallback.Glyph = "\uE721"; return; }
         LoadShortcutIcon(new LaunchShortcut { Name = app.Name, Target = app.IconTarget ?? app.Target }, icon, fallback, false);
     }

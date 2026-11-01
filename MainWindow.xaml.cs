@@ -106,6 +106,7 @@ public partial class MainWindow : Window
 
     private void ApplyState()
     {
+        launcherFlyout?.Hide();
         SynchronizeAppearance();
         bool useMica = state.Material == "Mica";
         if (SystemBackdrop is not SidebarBackdrop backdrop || backdrop.UsesMica != useMica)
@@ -167,6 +168,7 @@ public partial class MainWindow : Window
         };
         if (SystemBackdrop is SidebarBackdrop railBackdrop) railBackdrop.SetTheme(requestedTheme);
         if (Root.RequestedTheme != requestedTheme) Root.RequestedTheme = requestedTheme;
+        if (launcherSurface is not null && launcherSurface.RequestedTheme != requestedTheme) launcherFlyout?.Hide();
         Root.Background = RailSurfaceBrush(requestedTheme);
         ApplyLonghornVisuals();
         if (ready) ApplyCardCustomizations();
@@ -702,6 +704,8 @@ public sealed class SidebarState
     public bool LonghornHideSystemTray { get; set; }
     public int LonghornWidth { get; set; } = 168;
     public bool LonghornBottomClock { get; set; } = true;
+    public int LonghornPinIconSize { get; set; } = 22;
+    public int LonghornPinRows { get; set; } = 2;
     public bool LonghornShowPins { get; set; } = true;
     public bool LonghornTrayExpanded { get; set; }
     public Dictionary<string, GadgetCardStyle> CardStyles { get; set; } = new();

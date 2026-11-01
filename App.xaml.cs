@@ -20,7 +20,7 @@ public partial class App : Application
             window.Activate();
             window.AttachToDesktop();
 #if THEME_REGRESSION
-            window.DispatcherQueue.TryEnqueue(async () => { await Task.Delay(2500); if (Environment.GetCommandLineArgs().Contains("--v2-regression")) window.RunV2Regression(); else if (Environment.GetCommandLineArgs().Contains("--puzzle-regression")) window.RunPuzzleRegression(); else if (Environment.GetCommandLineArgs().Contains("--search-regression")) window.RunSearchRegression(); else window.RunThemeRegression(); });
+            window.DispatcherQueue.TryEnqueue(async () => { await Task.Delay(2500); if (Environment.GetCommandLineArgs().Contains("--launcher-flyout-regression")) window.RunLauncherFlyoutRegression(); else if (Environment.GetCommandLineArgs().Contains("--v2-regression")) window.RunV2Regression(); else if (Environment.GetCommandLineArgs().Contains("--puzzle-regression")) window.RunPuzzleRegression(); else if (Environment.GetCommandLineArgs().Contains("--search-regression")) window.RunSearchRegression(); else window.RunThemeRegression(); });
 #endif
         }
         catch (Exception ex) { LogFailure(ex); throw; }

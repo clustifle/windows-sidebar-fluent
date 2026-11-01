@@ -15,7 +15,12 @@ public sealed class InstalledApp
 internal static class InstalledApps
 {
     private static Task<IReadOnlyList<InstalledApp>>? cached;
-    public static Task<IReadOnlyList<InstalledApp>> GetAsync() => cached ??= RunSta<IReadOnlyList<InstalledApp>>(() =>
+    public static Task<IReadOnlyList<InstalledApp>> GetAsync(bool refresh = false)
+    {
+        if (refresh || cached?.IsFaulted == true) cached = null;
+        return cached ??= LoadAsync();
+    }
+    private static Task<IReadOnlyList<InstalledApp>> LoadAsync() => RunSta<IReadOnlyList<InstalledApp>>(() =>
     {
         var result = new List<InstalledApp>();
         object? shell = null, folder = null, items = null;

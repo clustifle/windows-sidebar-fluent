@@ -23,7 +23,7 @@ Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica
 
 ## Longhorn mode
 
-A continuous translucent rail inspired by [build 4074](https://betawiki.net/wiki/Windows_Longhorn_build_4074#Gallery). Search and pinned launchers sit at the top, tiles scroll through the middle, and the clock can dock at the bottom. Its default width is 168 logical pixels. Width and tile order are saved separately from ordinary sidebar mode.
+A continuous translucent rail inspired by [build 4074](https://betawiki.net/wiki/Windows_Longhorn_build_4074#Gallery). Search and pinned launchers sit at the top, tiles scroll through the middle, and the clock can dock at the bottom. Quick Launch has configurable icon size and row count, per-pin context menus, and an overflow entry for the remaining pins. Its default width is 168 logical pixels. Width and tile order are saved separately from ordinary sidebar mode.
 
 The original Windows taskbar stays visible and intact, including Start, running apps, tray, clock, Quick Settings, notifications, and input controls. The rail has no Start or Apps button, Quick Settings, Notifications, or Language Input Switcher. Old taskbar-hiding and tray-clipping preferences are reset during startup. A recovery helper runs briefly only if an older version left taskbar recovery data; neither sidebar mode keeps a shell helper running.
 
@@ -39,9 +39,9 @@ Expand any gadget under Gadgets, or right-click its card and choose Customize. E
 
 Content controls include clock faces/time zones/display; calendar week start, adjacent dates, and Today; note text size and writing height; performance refresh rate; timer duration and sound; storage drive; slideshow folder/interval/fit/file name; puzzle picture/numbered tiles/move count; feed address/count/interval; and Quick Launch columns/icon size/apps/websites.
 
-Right-click the sidebar and choose **Open app launcher** for the app grid, searchable installed apps and pinned websites, and an on-demand running-window list. Right-click app tiles to pin or unpin them. Launcher mode adds an Apps entry and search to the sidebar; it keeps the Windows taskbar visible.
+Right-click the sidebar and choose **Open app launcher** for a native flyout that opens toward the desktop. All apps, Pinned, and Windows views share search. Right-click tiles to pin, unpin, or reorder; Refresh updates installed apps. Escape or clicking outside dismisses the flyout. Launcher mode adds an Apps entry and search to the sidebar; it keeps the Windows taskbar visible.
 
-Quick Launch has Pinned, Apps, and Web tabs. Import copies accessible taskbar `.lnk` shortcuts without changing Windows' pins. Installed apps can be selected in Quick Launch customization. Rail search suggestions include app icons. Selecting an app launches it; submitting another query opens Windows file search.
+Quick Launch has Pinned, Apps, and Web tabs. Import copies accessible taskbar `.lnk` shortcuts without changing Windows' pins. Installed apps can be selected in Quick Launch customization. Website pins embed the site's declared favicon (or its `/favicon.ico`) into the saved pin after adding it, so the icon remains available offline. Rail search suggestions include app icons. Selecting an app launches it; submitting another query opens Windows file search.
 
 Background work follows visibility: offscreen gadgets skip live updates, hidden auto-hide mode slows the gadget timer, and slideshow/panel polling stops when unused. App icons use a bounded memory cache. A visible second hand or active countdown still requires one-second updates. Neither mode keeps a background shell helper running.
 
@@ -94,7 +94,7 @@ The MSI is written to `artifacts\installer`. `tools\Build-Icon.ps1` regenerates 
 
 ## Data and startup
 
-Preferences, shortcut icons, and notes are stored in `%LOCALAPPDATA%\ClassicSidebar\settings.json`. Startup is optional and uses the current user's Run entry named `FluentSidebar` (the previous startup entry migrates automatically). The app does not upload preferences or notes. Network requests go to configured feed addresses and provider-supplied thumbnail URLs while the feed card is visible. Article and website links open when clicked.
+Preferences, embedded shortcut icons, and notes are stored in `%LOCALAPPDATA%\ClassicSidebar\settings.json`. Startup is optional and uses the current user's Run entry named `FluentSidebar` (the previous startup entry migrates automatically). The app does not upload preferences or notes. Network requests go to configured website origins to retrieve their favicon when a website pin is added, configured feed addresses, and provider-supplied thumbnail URLs while the feed card is visible. Article and website links open when clicked.
 
 ## Scope and verification
 

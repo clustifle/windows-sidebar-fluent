@@ -18,6 +18,8 @@ public partial class MainWindow
 {
     private readonly Dictionary<string, BitmapImage> shortcutImages = new();
     private readonly Dictionary<string, Task<string>> loadingShortcutIcons = new();
+    private readonly Dictionary<string, Task<string>> loadingWebsiteIcons = new();
+    private readonly HashSet<string> failedWebsiteIcons = new(StringComparer.OrdinalIgnoreCase);
 
     private void RefreshQuickLaunch()
     {
@@ -26,19 +28,23 @@ public partial class MainWindow
         {
         grid.Children.Clear(); grid.RowDefinitions.Clear(); grid.ColumnDefinitions.Clear();
         bool rail = state.LonghornMode && grid == LonghornPins;
-        int columns = Math.Clamp(state.LaunchColumns, 2, 6);
+        int railIcon = Math.Clamp(state.LonghornPinIconSize, 16, 28), railButton = Math.Max(30, railIcon + 12);
+        int columns = rail ? Math.Clamp((SidebarWidth - 12) / railButton, 1, 8) : Math.Clamp(state.LaunchColumns, 2, 6);
+        int capacity = columns * Math.Clamp(state.LonghornPinRows, 1, 3);
+        bool overflow = rail && state.Shortcuts.Count > capacity;
+        var shortcuts = rail ? state.Shortcuts.Take(overflow ? capacity - 1 : capacity) : state.Shortcuts.AsEnumerable();
         for (int column = 0; column < columns; column++) grid.ColumnDefinitions.Add(new ColumnDefinition());
-        foreach (var shortcut in state.Shortcuts)
+        foreach (var shortcut in shortcuts)
         {
             int available = Math.Max(12, (SidebarWidth - (rail ? 10 : 48)) / columns - 12);
-            int iconSize = Math.Min(available, rail ? (int)Math.Round(Math.Clamp(state.LaunchIconSize, 16, 40) * 0.65) : Math.Clamp(state.LaunchIconSize, 16, 40));
+            int iconSize = Math.Min(available, rail ? railIcon : Math.Clamp(state.LaunchIconSize, 16, 40));
             var row = new Grid { Width = iconSize, Height = iconSize };
             bool website = IsWebsite(shortcut.Target);
-            var fallback = new FontIcon { Glyph = website ? "\uE774" : "\uE8A5", FontSize = 20 };
+            var fallback = new FontIcon { Glyph = website ? "\uE774" : "\uE71D", FontSize = Math.Min(20, iconSize) };
             row.Children.Add(fallback);
             var image = new Image { Width = iconSize, Height = iconSize, Visibility = Visibility.Collapsed };
             row.Children.Add(image);
-            var button = new Button { Content = row, Width = iconSize + 12, Height = iconSize + 12, Padding = new Thickness(6), Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0) };
+            var button = new Button { Content = row, Width = rail ? railButton : iconSize + 12, Height = rail ? railButton : iconSize + 12, MinWidth = 0, MinHeight = 0, Padding = new Thickness(6), CornerRadius = new CornerRadius(4), Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0), ContextFlyout = BuildPinMenu(shortcut) };
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, shortcut.Name);
             ToolTipService.SetToolTip(button, shortcut.Name);
             button.Click += async (_, _) => await OpenShortcut(shortcut);
@@ -46,11 +52,24 @@ public partial class MainWindow
             Grid.SetColumn(button, index % columns); Grid.SetRow(button, index / columns);
             if (index % columns == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.Children.Add(button);
-            if (!website) LoadShortcutIcon(shortcut, image, fallback);
+            LoadShortcutIcon(shortcut, image, fallback);
         }
-        if (state.Shortcuts.Count == 0) grid.Children.Add(new TextBlock { Text = "Choose Edit to add apps or websites.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        if (rail && (overflow || state.Shortcuts.Count == 0))
+        {
+            int index = grid.Children.Count;
+            var more = new Button { Content = new FontIcon { Glyph = overflow ? "\uE712" : "\uE710", FontSize = 16 }, Width = railButton, Height = railButton, MinWidth = 0, MinHeight = 0, Padding = new Thickness(6), Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent), BorderThickness = new Thickness(0), CornerRadius = new CornerRadius(4) };
+            string label = overflow ? $"All {state.Shortcuts.Count} pinned apps" : "Choose apps to pin";
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(more, label); ToolTipService.SetToolTip(more, label);
+            more.Click += (_, _) => { if (overflow) OpenPinnedLauncher(); else ShowLauncherFlyout(0); };
+            Grid.SetColumn(more, index % columns); Grid.SetRow(more, index / columns);
+            if (index % columns == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.Children.Add(more);
         }
-        Render(LaunchItems);
+        else if (!rail && state.Shortcuts.Count == 0)
+        { var empty = new TextBlock { Text = "Choose Edit to add apps or websites.", FontSize = 12, TextWrapping = TextWrapping.Wrap }; Grid.SetColumnSpan(empty, columns); grid.Children.Add(empty); }
+        }
+        if (!state.LonghornMode) Render(LaunchItems);
+        else { LaunchItems.Children.Clear(); LaunchItems.RowDefinitions.Clear(); LaunchItems.ColumnDefinitions.Clear(); }
         if (state.LonghornMode) Render(LonghornPins); else { LonghornPins.Children.Clear(); LonghornPins.RowDefinitions.Clear(); }
         ApplyLonghornSections();
     }
@@ -64,7 +83,30 @@ public partial class MainWindow
         {
             if (!shortcutImages.TryGetValue(shortcut.Target, out var bitmap))
             {
-                if (string.IsNullOrEmpty(shortcut.IconData) || shortcut.IconVersion < 2)
+                if (IsWebsite(shortcut.Target))
+                {
+                    if (shortcut.IconVersion >= 3)
+                    {
+                        // A completed lookup is stored with the pin, including a miss, to avoid
+                        // repeating network work every time the rail is drawn.
+                    }
+                    else
+                    {
+                        if (failedWebsiteIcons.Contains(shortcut.Target)) return;
+                        if (!loadingWebsiteIcons.TryGetValue(shortcut.Target, out var faviconTask))
+                            loadingWebsiteIcons[shortcut.Target] = faviconTask = WebsiteIcons.GetEmbeddedAsync(shortcut.Target);
+                        try
+                        {
+                            shortcut.IconData = await faviconTask;
+                            shortcut.IconVersion = 3;
+                            if (string.IsNullOrEmpty(shortcut.IconData)) failedWebsiteIcons.Add(shortcut.Target);
+                            if (persist) Save();
+                        }
+                        finally { loadingWebsiteIcons.Remove(shortcut.Target); }
+                        if (string.IsNullOrEmpty(shortcut.IconData)) return;
+                    }
+                }
+                else if (string.IsNullOrEmpty(shortcut.IconData) || shortcut.IconVersion < 2)
                 {
                     if (!loadingShortcutIcons.TryGetValue(shortcut.Target, out var iconTask))
                         loadingShortcutIcons[shortcut.Target] = iconTask = ShortcutIcons.GetEmbeddedAsync(shortcut.Target);
@@ -164,7 +206,21 @@ public partial class MainWindow
                 if (IsWebsite(shortcut.Target))
                 {
                     var address = new TextBox { Text = shortcut.Target };
-                    address.LostFocus += (_, _) => { if (IsWebsite(address.Text)) { shortcut.Target = address.Text.Trim(); Persist(); } else status.Text = "Enter a complete http or https address."; };
+                    address.LostFocus += (_, _) =>
+                    {
+                        if (IsWebsite(address.Text))
+                        {
+                            string next = new Uri(address.Text.Trim()).AbsoluteUri;
+                            if (!shortcut.Target.Equals(next, StringComparison.OrdinalIgnoreCase))
+                            {
+                                shortcutImages.Remove(shortcut.Target);
+                                failedWebsiteIcons.Remove(shortcut.Target);
+                                shortcut.IconData = ""; shortcut.IconVersion = 0; shortcut.Target = next;
+                            }
+                            Persist();
+                        }
+                        else status.Text = "Enter a complete http or https address.";
+                    };
                     entry.Children.Add(address);
                 }
                 var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
@@ -206,12 +262,23 @@ public partial class MainWindow
             }
             finally { addApp.IsEnabled = appsList.SelectedIndex >= 0; }
         };
-        addWebsite.Click += (_, _) =>
+        addWebsite.Click += async (_, _) =>
         {
             if (!IsWebsite(urlBox.Text)) { status.Text = "Enter a complete http or https address."; return; }
-            var uri = new Uri(urlBox.Text);
+            var uri = new Uri(urlBox.Text.Trim());
+            if (state.Shortcuts.Any(s => s.Target.Equals(uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase))) { status.Text = "This website is already added."; return; }
             state.Shortcuts.Add(new LaunchShortcut { Name = string.IsNullOrWhiteSpace(nameBox.Text) ? uri.Host : nameBox.Text.Trim(), Target = uri.AbsoluteUri });
-            nameBox.Text = ""; urlBox.Text = ""; status.Text = ""; Persist(); Render();
+            nameBox.Text = ""; urlBox.Text = ""; Persist(); Render();
+            status.Text = "Added. Loading the website icon…";
+            string icon = await WebsiteIcons.GetEmbeddedAsync(uri.AbsoluteUri);
+            var added = state.Shortcuts.FirstOrDefault(s => s.Target.Equals(uri.AbsoluteUri, StringComparison.OrdinalIgnoreCase));
+            if (added is not null)
+            {
+                added.IconData = icon; added.IconVersion = 3;
+                if (string.IsNullOrEmpty(icon)) failedWebsiteIcons.Add(added.Target);
+                Save(); RefreshQuickLaunch(); Render();
+            }
+            status.Text = string.IsNullOrEmpty(icon) ? "Added. This site does not provide a usable icon." : "Website icon embedded.";
         };
         async Task LoadApps()
         {

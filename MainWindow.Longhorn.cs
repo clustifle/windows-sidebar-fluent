@@ -78,7 +78,7 @@ public partial class MainWindow
 
     private void ApplyLonghornSections()
     {
-        LonghornPinsSection.Visibility = state.LonghornShowPins && (state.Shortcuts?.Count ?? 0) > 0 ? Visibility.Visible : Visibility.Collapsed;
+        LonghornPinsSection.Visibility = state.LonghornShowPins ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private int railSearchGeneration;
