@@ -47,7 +47,7 @@ public partial class MainWindow
         side.Toggled += async (_, _) => { if (side.IsOn != state.Left) await MoveSidebarAsync(side.IsOn); }; behavior.Children.Add(side);
         AddToggle(behavior, "Keep above other windows", state.AlwaysOnTop, value => state.AlwaysOnTop = value);
         AddToggle(behavior, "Start with Windows", StartupPreference.Enabled, SetStartup);
-        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 1.3.0 preview. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 1.3.1 preview. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         return tabs;
     }
     private void ActivatePreferences()

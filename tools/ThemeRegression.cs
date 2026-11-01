@@ -116,7 +116,7 @@ public partial class MainWindow
             await Task.Delay(350); desktopActive = true; RevealSidebar(); await Task.Delay(350);
             state.AutoHide = false; ApplyState(); Activate(); LonghornSearch.Focus(FocusState.Programmatic);
             LonghornSearch.ItemsSource = (await InstalledApps.GetAsync()).Take(3).ToArray();
-            var popup = SidebarAppSearchBox.Configure(LonghornSearch); LonghornSearch.IsSuggestionListOpen = true; await Task.Delay(600);
+            var popup = SidebarAppSearchBox.Configure(LonghornSearch, state.Left); LonghornSearch.IsSuggestionListOpen = true; await Task.Delay(600);
             if (popup is null || !popup.IsOpen || popup.ShouldConstrainToRootBounds || popup.Child is not FrameworkElement results || results.ActualWidth < 280 || LonghornSearch.ItemTemplate is null) throw new Exception("App search suggestions are clipped");
             LonghornSearch.IsSuggestionListOpen = false; LonghornSearch.ItemsSource = null;
             state.LonghornMode = false; await UpdateLonghornAsync();

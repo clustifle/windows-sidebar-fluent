@@ -12,9 +12,11 @@ public partial class MainWindow
     private bool shellShutdownPrepared;
     private void InitializeLonghorn()
     {
-        LonghornSearch.Loaded += (_, _) => SidebarAppSearchBox.Configure(LonghornSearch);
-        LonghornSearch.ActualThemeChanged += (_, _) => SidebarAppSearchBox.Configure(LonghornSearch);
-        SidebarAppSearchBox.Configure(LonghornSearch);
+        LonghornSearch.Loaded += (_, _) => SidebarAppSearchBox.Configure(LonghornSearch, state.Left);
+        LonghornSearch.ActualThemeChanged += (_, _) => SidebarAppSearchBox.Configure(LonghornSearch, state.Left);
+        SidebarAppSearchBox.Configure(LonghornSearch, state.Left);
+        LonghornSearch.RegisterPropertyChangedCallback(AutoSuggestBox.IsSuggestionListOpenProperty, (_, _) =>
+        { if (LonghornSearch.IsSuggestionListOpen) hideTimer.Stop(); else QueueAutoHide(); });
         ShellBridge.Restore();
         AppWindow.Closing += (_, args) =>
         {
@@ -89,8 +91,8 @@ public partial class MainWindow
         {
             var apps = await InstalledApps.GetAsync();
             if (generation != railSearchGeneration || closing || !state.LonghornMode) return;
-            SidebarAppSearchBox.Configure(sender);
             var matches = apps.Where(app => app.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).OrderByDescending(app => app.Name.StartsWith(query, StringComparison.CurrentCultureIgnoreCase)).Take(8).ToArray(); sender.ItemsSource = matches.Length == 0 ? new[] { new InstalledApp("No matching apps", "") } : matches;
+            SidebarAppSearchBox.Configure(sender, state.Left);
         }
         catch (Exception) { if (generation == railSearchGeneration) sender.ItemsSource = null; }
     }

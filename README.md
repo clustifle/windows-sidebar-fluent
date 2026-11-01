@@ -60,6 +60,8 @@ Sidebar renegotiates screen space on taskbar/work-area changes, including top, b
 
 Additional gadgets can be enabled from **+**. Picture folders, puzzle pictures, and feed URLs are chosen by the user. No example headlines or weather values are presented as live data.
 
+App search opens its results toward the desktop, with a fixed readable panel width, app icons, and full-name tooltips. Auto-hide waits while the results are open. Moving the rail closes the results first.
+
 ## Build from source
 
 Install the .NET 10 SDK and Visual Studio WinUI/Windows SDK build tools. Then:

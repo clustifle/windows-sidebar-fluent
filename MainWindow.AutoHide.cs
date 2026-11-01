@@ -30,7 +30,7 @@ public partial class MainWindow
         hideTimer.Tick += (_, _) =>
         {
             hideTimer.Stop();
-            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
+            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && !LonghornSearch.IsSuggestionListOpen && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
         };
         revealTimer.Tick += (_, _) => AdvanceReveal();
         foregroundCallback = (_, _, _, _, _, _, _) => DispatcherQueue.TryEnqueue(UpdateDesktopVisibility);
@@ -49,7 +49,7 @@ public partial class MainWindow
 
     private void QueueAutoHide()
     {
-        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || draggingGadget is not null) return;
+        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || LonghornSearch.IsSuggestionListOpen || draggingGadget is not null) return;
         hideTimer.Stop(); hideTimer.Start();
     }
 
@@ -115,6 +115,7 @@ public partial class MainWindow
     private async Task MoveSidebarAsync(bool left)
     {
         requestedLeft = left;
+        LonghornSearch.IsSuggestionListOpen = false;
         if (sideMoveRunning || sidebarClosed) return;
         sideMoveRunning = true;
         hideTimer.Stop(); revealTimer.Stop(); currentReveal = revealFrom = revealTo = 1; revealGeneration++;
