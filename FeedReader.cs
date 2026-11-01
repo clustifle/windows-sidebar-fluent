@@ -9,7 +9,7 @@ internal static class FeedReader
 {
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(15) };
     private const int Limit = 2 * 1024 * 1024;
-    public static async Task<IReadOnlyList<FeedHeadline>> FetchAsync(Uri uri, CancellationToken token)
+    public static async Task<IReadOnlyList<FeedHeadline>> FetchAsync(Uri uri, CancellationToken token, int count = 5)
     {
         using var response = await Client.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, token);
         response.EnsureSuccessStatusCode();
@@ -24,9 +24,9 @@ internal static class FeedReader
             memory.Write(buffer, 0, read);
         }
         memory.Position = 0;
-        return await Task.Run(() => Parse(memory, response.RequestMessage?.RequestUri ?? uri), token);
+        return await Task.Run(() => Parse(memory, response.RequestMessage?.RequestUri ?? uri, count), token);
     }
-    internal static IReadOnlyList<FeedHeadline> Parse(Stream source, Uri baseUri)
+    internal static IReadOnlyList<FeedHeadline> Parse(Stream source, Uri baseUri, int count = 5)
     {
         using var reader = XmlReader.Create(source, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersInDocument = Limit });
         var document = XDocument.Load(reader);
@@ -37,7 +37,7 @@ internal static class FeedReader
             var linkNode = entry.Elements().FirstOrDefault(e => e.Name.LocalName == "link" && (e.Attribute("rel") is null || e.Attribute("rel")?.Value == "alternate"));
             string link = linkNode?.Attribute("href")?.Value ?? linkNode?.Value ?? "";
             if (title.Length > 0 && !string.IsNullOrWhiteSpace(link) && Uri.TryCreate(baseUri, link.Trim(), out var uri) && uri.Scheme is "http" or "https") headlines.Add(new(title, uri));
-            if (headlines.Count == 5) break;
+            if (headlines.Count == Math.Clamp(count, 1, 10)) break;
         }
         return headlines;
     }

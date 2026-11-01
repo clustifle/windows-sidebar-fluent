@@ -22,7 +22,7 @@ internal sealed class TrayIcon : IDisposable
         Add();
     }
 
-    private NotifyIconData Data() => new() { Size = (uint)Marshal.SizeOf<NotifyIconData>(), Window = hwnd, Id = 1, Flags = 1 | 2 | 4, Callback = callback, Icon = icon, Tip = "Fluent Sidebar — right-click for settings", Info = "", InfoTitle = "" };
+    private NotifyIconData Data() => new() { Size = (uint)Marshal.SizeOf<NotifyIconData>(), Window = hwnd, Id = 1, Flags = 1 | 2 | 4, Callback = callback, Icon = icon, Tip = "FluentSidebar — right-click for settings", Info = "", InfoTitle = "" };
     private void Add()
     {
         var data = Data();

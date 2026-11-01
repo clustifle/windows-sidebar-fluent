@@ -19,7 +19,7 @@ $monitorInfo = New-Object SidebarDesktopProbe+MONITORINFO
 $monitorInfo.Size = [Runtime.InteropServices.Marshal]::SizeOf($monitorInfo)
 $monitorHandle = [SidebarDesktopProbe]::MonitorFromWindow([IntPtr]::Zero, 1)
 if (-not [SidebarDesktopProbe]::GetMonitorInfo($monitorHandle, [ref]$monitorInfo)) { throw 'Cannot read desktop work area.' }
-$windowInfo = @(Get-Process Sidebar,'Windows Sidebar Fluent',Notepad -ErrorAction SilentlyContinue | Where-Object MainWindowHandle -ne 0 | ForEach-Object {
+$windowInfo = @(Get-Process Sidebar,'FluentSidebar',Notepad -ErrorAction SilentlyContinue | Where-Object MainWindowHandle -ne 0 | ForEach-Object {
     $rect = New-Object SidebarDesktopProbe+RECT
     $frame = New-Object SidebarDesktopProbe+RECT
     [void][SidebarDesktopProbe]::GetWindowRect($_.MainWindowHandle, [ref]$rect)

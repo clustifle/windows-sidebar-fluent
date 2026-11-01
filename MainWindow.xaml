@@ -4,8 +4,16 @@
    <Style x:Key="RailButton" TargetType="Button"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="6,8"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
    <Style x:Key="GadgetTile" TargetType="Border"><Setter Property="Padding" Value="12"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
   </Grid.Resources>
-  <Grid.RowDefinitions><RowDefinition Height="0"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0"><StackPanel x:Name="GadgetStack" Spacing="12">
+  <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <StackPanel x:Name="LonghornHeader" Grid.Row="0" Visibility="Collapsed" Spacing="4">
+   <Grid x:Name="LonghornLaunchButtons" ColumnSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
+    <Button Click="LonghornStart_Click" AutomationProperties.Name="Start" ToolTipService.ToolTip="Start" Padding="3" MinWidth="0" Background="Transparent" BorderThickness="0"><Image Width="20" Height="20" Source="ms-appx:///Assets/Windows11Start.svg" AutomationProperties.Name="Windows 11 Start"/></Button>
+    <Button Grid.Column="1" Click="LonghornApps_Click" Content="Apps" FontSize="11" Padding="4" Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch"/>
+    <Button Grid.Column="2" Click="RestoreTaskbar_Click" AutomationProperties.Name="Restore Windows taskbar" ToolTipService.ToolTip="Restore Windows taskbar" Padding="4" MinWidth="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE777;" FontSize="12"/></Button>
+   </Grid>
+   <AutoSuggestBox x:Name="LonghornSearch" PlaceholderText="Search for…" QueryIcon="Find" FontSize="12" MinWidth="0" TextMemberPath="Name" DisplayMemberPath="Name" TextChanged="LonghornSearch_TextChanged" SuggestionChosen="LonghornSearch_SuggestionChosen" QuerySubmitted="LonghornSearch_QuerySubmitted" AutomationProperties.Name="Search apps or files"/>
+  </StackPanel>
+  <ScrollViewer x:Name="GadgetScroller" Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0"><StackPanel x:Name="GadgetStack" Spacing="12">
   <Border x:Name="ClockGadget" Style="{StaticResource GadgetTile}" DoubleTapped="Clock_DoubleTapped"><StackPanel Spacing="4" HorizontalAlignment="Center">
    <Viewbox x:Name="ClockView" Width="96" Height="96"><Canvas x:Name="ClockFace" Width="156" Height="156" AutomationProperties.Name="Analog clock"/></Viewbox>
    <TextBlock x:Name="TimeText" FontSize="24" FontWeight="SemiLight" HorizontalAlignment="Center"/>
@@ -13,14 +21,14 @@
    <TextBlock x:Name="ClockCaption" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" TextWrapping="Wrap" MaxWidth="190"/>
   </StackPanel></Border>
 
-   <Border x:Name="CalendarGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8">
+   <Border x:Name="CalendarGadget" Style="{StaticResource GadgetTile}"><StackPanel Spacing="4">
     <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <TextBlock x:Name="MonthText" FontSize="16" VerticalAlignment="Center" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-     <Button Grid.Column="1" Click="PreviousMonth_Click" AutomationProperties.Name="Previous month" ToolTipService.ToolTip="Previous month" Width="28" Height="28" MinWidth="28" Padding="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76B;" FontSize="12"/></Button>
-     <Button Grid.Column="2" Click="NextMonth_Click" AutomationProperties.Name="Next month" ToolTipService.ToolTip="Next month" Width="28" Height="28" MinWidth="28" Padding="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76C;" FontSize="12"/></Button>
+     <Button Grid.Column="1" Click="PreviousMonth_Click" AutomationProperties.Name="Previous month" ToolTipService.ToolTip="Previous month" Width="24" Height="24" MinWidth="24" Padding="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76B;" FontSize="12"/></Button>
+     <Button Grid.Column="2" Click="NextMonth_Click" AutomationProperties.Name="Next month" ToolTipService.ToolTip="Next month" Width="24" Height="24" MinWidth="24" Padding="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76C;" FontSize="12"/></Button>
     </Grid>
     <Grid x:Name="CalendarGrid" RowSpacing="2" ColumnSpacing="1"/>
-    <Grid><TextBlock x:Name="CalendarTodayText" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/><Button Content="Today" Click="Today_Click" HorizontalAlignment="Right" Padding="8,4" FontSize="11" Background="Transparent" BorderThickness="0"/></Grid>
+    <Grid><TextBlock x:Name="CalendarTodayText" FontSize="11" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center"/><Button x:Name="CalendarTodayButton" Content="Today" Click="Today_Click" HorizontalAlignment="Right" MinHeight="24" Padding="6,2" FontSize="11" Background="Transparent" BorderThickness="0"/></Grid>
    </StackPanel></Border>
    <Border x:Name="TimerCategory" Style="{StaticResource GadgetTile}"><StackPanel Spacing="8"><TextBlock Text="Timer" FontWeight="SemiBold"/>
     <TextBlock x:Name="TimerText" Text="05:00" FontSize="28" HorizontalAlignment="Center"/>
@@ -65,26 +73,20 @@
     <Grid x:Name="LaunchItems" RowSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid>
    </StackPanel></Border>
   </StackPanel></ScrollViewer>
-  <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
+  <StackPanel x:Name="PageControls" Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
    <Button x:Name="PreviousPage" Click="PreviousPage_Click" AutomationProperties.Name="Previous gadget page" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76B;" FontSize="12"/></Button>
    <Button x:Name="NextPage" Click="NextPage_Click" AutomationProperties.Name="Next gadget page" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE76C;" FontSize="12"/></Button>
    <Button Click="Add_Click" AutomationProperties.Name="Add or customize gadgets" ToolTipService.ToolTip="Add gadgets" Width="28" Height="28" MinWidth="0" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE710;" FontSize="12"/></Button>
    <TextBlock x:Name="PageIndicator" Visibility="Collapsed"/>
   </StackPanel>
-  <StackPanel x:Name="LonghornPanel" Grid.Row="5" Visibility="Collapsed" Spacing="2">
-   <Border BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="0,5,0,0"><ScrollViewer MaxHeight="64" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="LonghornPins" AutomationProperties.Name="Pinned apps" RowSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer></Border>
-   <Border BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="0,4,0,0"><ScrollViewer MaxHeight="58" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="RunningItems" AutomationProperties.Name="Running windows" RowSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer></Border>
-   <Border BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="0,4,0,0"><ScrollViewer MaxHeight="42" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="ShellTrayItems" AutomationProperties.Name="Application tray" RowSpacing="1"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer></Border>
+  <StackPanel x:Name="LonghornPanel" Grid.Row="1" Visibility="Collapsed" Spacing="2">
+   <Border x:Name="LonghornPinsSection" BorderThickness="0,1,0,0" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" Padding="0,3,0,0"><ScrollViewer MaxHeight="58" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><Grid x:Name="LonghornPins" AutomationProperties.Name="Pinned apps" RowSpacing="1"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid></ScrollViewer></Border>
+
+  </StackPanel>
+  <StackPanel x:Name="LonghornBottom" Grid.Row="5" Visibility="Collapsed" Spacing="2">
+   <StackPanel x:Name="LonghornClockDock" AllowDrop="True" MinHeight="12" AutomationProperties.Name="Bottom clock dock"/>
    <Grid x:Name="LonghornSystemButtons" ColumnSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid>
-   <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="32"/><ColumnDefinition Width="32"/></Grid.ColumnDefinitions>
-    <Button Content="Start" Click="LonghornStart_Click" HorizontalAlignment="Stretch" Style="{StaticResource AccentButtonStyle}" CornerRadius="2" Padding="10,4"/>
-    <Button Grid.Column="1" Click="LonghornApps_Click" AutomationProperties.Name="All apps" ToolTipService.ToolTip="All apps" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE721;" FontSize="14"/></Button>
-    <Button Grid.Column="2" Click="RestoreTaskbar_Click" AutomationProperties.Name="Restore Windows taskbar" ToolTipService.ToolTip="Restore Windows taskbar" Padding="6" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE777;" FontSize="14"/></Button>
-   </Grid>
   </StackPanel>
   <TextBlock Grid.Row="4" x:Name="PanelStatus" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
  </Grid>
 </Window>
-
-
-

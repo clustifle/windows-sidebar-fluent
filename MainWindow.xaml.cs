@@ -108,18 +108,27 @@ public partial class MainWindow : Window
         if (SystemBackdrop is not SidebarBackdrop backdrop || backdrop.UsesMica != useMica)
             SystemBackdrop = new SidebarBackdrop(useMica);
         ((SidebarBackdrop)SystemBackdrop).SetTheme(Root.RequestedTheme);
+        if (preferencesWindow is not null && (preferencesWindow.SystemBackdrop is not SidebarBackdrop settingsMaterial || settingsMaterial.UsesMica != useMica))
+            preferencesWindow.SystemBackdrop = new SidebarBackdrop(useMica);
+        if (preferencesWindow?.SystemBackdrop is SidebarBackdrop preferencesMaterial) preferencesMaterial.SetTheme(Root.RequestedTheme);
         ClockGadget.Visibility = state.Clock ? Visibility.Visible : Visibility.Collapsed;
         ClockView.Visibility = state.ClockStyle == "Digital" ? Visibility.Collapsed : Visibility.Visible;
         TimeText.Visibility = state.ClockStyle == "Analog" ? Visibility.Collapsed : Visibility.Visible;
         NotesBox.MinHeight = Math.Clamp(state.NoteHeight, 72, 240);
+        if (!timerDeadline.HasValue && pausedTimer == TimeSpan.Zero) TimerMinutes.Value = Math.Clamp(state.TimerDuration, 1, 180);
         NotesBox.MaxHeight = Math.Max(180, NotesBox.MinHeight);
         NormalizeGadgetOrder();
+        LonghornClockDock.Children.Clear();
         GadgetStack.Children.Clear();
-        foreach (var id in state.GadgetOrder) GadgetStack.Children.Add(GadgetElement(id));
+        foreach (var id in ActiveGadgetOrder)
+            if (state.LonghornMode && state.LonghornBottomClock && id == "Clock") LonghornClockDock.Children.Add(ClockGadget);
+            else GadgetStack.Children.Add(GadgetElement(id));
         ApplyGadgetPage();
         ClockView.Width = ClockView.Height = state.CompactClock ? 80 : 120;
         ApplyClockPreferences();
-        appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide, taskbarReplacementActive);
+        ApplyGadgetSizes();
+        ApplyCardCustomizations();
+        PositionSidebar();
         ApplyAutoHidePreference();
         UpdateTimerInterval();
         if (ready) UpdateGadgets();
@@ -157,6 +166,8 @@ public partial class MainWindow : Window
         if (Root.RequestedTheme != requestedTheme) Root.RequestedTheme = requestedTheme;
         Root.Background = RailSurfaceBrush(requestedTheme);
         ApplyLonghornVisuals();
+        if (ready) ApplyCardCustomizations();
+        SynchronizeShellPanelTheme();
         if (preferencesWindow?.SystemBackdrop is SidebarBackdrop settingsBackdrop) settingsBackdrop.SetTheme(requestedTheme);
         if (preferencesWindow?.Content is FrameworkElement preferencesRoot)
         {
@@ -183,9 +194,12 @@ public partial class MainWindow : Window
 
     private void PositionSidebar()
     {
-        appBar?.Configure(state.Left, state.AlwaysOnTop, state.Width, state.AutoHide, taskbarReplacementActive);
+        appBar?.Configure(state.Left, state.AlwaysOnTop, SidebarWidth, state.AutoHide, taskbarReplacementActive);
         ApplyAutoHidePreference();
     }
+
+    private int SidebarWidth => state.LonghornMode ? Math.Clamp(state.LonghornWidth, 156, 280) : Math.Clamp(state.Width, 220, 360);
+    private List<string> ActiveGadgetOrder => state.LonghornMode ? state.LonghornGadgetOrder : state.GadgetOrder;
 
     private FrameworkElement GadgetElement(string id) => id switch
     {
@@ -224,6 +238,7 @@ public partial class MainWindow : Window
         string[] known = ["Calendar", "Clock", "Notes", "Performance", "Timer", "Storage", "Quick launch", "Slide show", "Picture puzzle", "Feed headlines"];
         bool migrate = state.LayoutVersion < 3;
         state.GadgetOrder = (state.GadgetOrder ?? []).Where(known.Contains).Concat(known).Distinct().ToList();
+        state.LonghornGadgetOrder = (state.LonghornGadgetOrder ?? []).Where(known.Contains).Concat(known).Distinct().ToList();
         if (migrate && state.GadgetOrder.Count > 1 && state.GadgetOrder[0] == "Clock")
         {
             state.GadgetOrder.RemoveAt(0);
@@ -235,16 +250,17 @@ public partial class MainWindow : Window
 
     private void ApplyGadgetPage()
     {
-        foreach (var id in state.GadgetOrder) GadgetElement(id).Visibility = Visibility.Collapsed;
-        var enabled = state.GadgetOrder.Where(id => GadgetEnabled(id) && !(state.LonghornMode && id == "Quick launch")).ToArray();
+        foreach (var id in ActiveGadgetOrder) GadgetElement(id).Visibility = Visibility.Collapsed;
+        var enabled = ActiveGadgetOrder.Where(id => GadgetEnabled(id) && !(state.LonghornMode && (id == "Quick launch" || (id == "Clock" && state.LonghornBottomClock)))).ToArray();
         int density = Math.Clamp(state.GadgetsPerPage, 1, 3);
         int pages = Math.Max(1, (enabled.Length + density - 1) / density);
         state.PageIndex = Math.Clamp(state.PageIndex, 0, pages - 1);
-        foreach (var id in enabled.Skip(state.PageIndex * density).Take(density)) GadgetElement(id).Visibility = Visibility.Visible;
+        foreach (var id in state.LonghornMode ? enabled : enabled.Skip(state.PageIndex * density).Take(density)) GadgetElement(id).Visibility = Visibility.Visible;
+        if (state.LonghornMode && state.LonghornBottomClock && state.Clock) ClockGadget.Visibility = Visibility.Visible;
         PageIndicator.Text = enabled.Length == 0 ? "No gadgets" : $"{state.PageIndex + 1} / {pages}";
         PreviousPage.IsEnabled = state.PageIndex > 0;
         NextPage.IsEnabled = state.PageIndex < pages - 1;
-        PreviousPage.Visibility = NextPage.Visibility = pages > 1 ? Visibility.Visible : Visibility.Collapsed;
+        PreviousPage.Visibility = NextPage.Visibility = !state.LonghornMode && pages > 1 ? Visibility.Visible : Visibility.Collapsed;
         ToolTipService.SetToolTip(PreviousPage, $"Previous page · {state.PageIndex + 1} of {pages}");
         ToolTipService.SetToolTip(NextPage, $"Next page · {state.PageIndex + 1} of {pages}");
         nextPerformanceUpdate = DateTime.MinValue;
@@ -287,10 +303,23 @@ public partial class MainWindow : Window
         ClockFace.Children.Clear();
         bool ivory = state.ClockFaceStyle == "Ivory";
         bool midnight = state.ClockFaceStyle == "Midnight";
-        Brush ink = ivory ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 58, 49, 37)) : midnight ? new SolidColorBrush(Colors.White) : TimeText.Foreground;
+        bool longhorn = state.ClockFaceStyle == "Longhorn" || (state.LonghornMode && state.ClockFaceStyle == "Minimal");
+        Brush ink = longhorn ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 54, 65, 73)) : ivory ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 58, 49, 37)) : midnight ? new SolidColorBrush(Colors.White) : TimeText.Foreground;
+        if (longhorn)
+        {
+            var rim = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0, 0), EndPoint = new Windows.Foundation.Point(1, 1) };
+            rim.GradientStops.Add(new GradientStop { Color = Windows.UI.Color.FromArgb(255, 240, 243, 242), Offset = 0 });
+            rim.GradientStops.Add(new GradientStop { Color = Windows.UI.Color.FromArgb(255, 112, 125, 130), Offset = 0.5 });
+            rim.GradientStops.Add(new GradientStop { Color = Windows.UI.Color.FromArgb(255, 206, 215, 216), Offset = 1 });
+            ClockFace.Children.Add(new Ellipse { Width = 156, Height = 156, Fill = rim });
+            var dial = new LinearGradientBrush { StartPoint = new Windows.Foundation.Point(0, 0), EndPoint = new Windows.Foundation.Point(0, 1) };
+            dial.GradientStops.Add(new GradientStop { Color = Colors.White, Offset = 0 });
+            dial.GradientStops.Add(new GradientStop { Color = Windows.UI.Color.FromArgb(255, 207, 218, 223), Offset = 1 });
+            var face = new Ellipse { Width = 144, Height = 144, Fill = dial }; Canvas.SetLeft(face, 6); Canvas.SetTop(face, 6); ClockFace.Children.Add(face);
+        }
         if (ivory || midnight)
             ClockFace.Children.Add(new Ellipse { Width = 156, Height = 156, Fill = new SolidColorBrush(ivory ? Windows.UI.Color.FromArgb(255, 247, 238, 215) : Windows.UI.Color.FromArgb(255, 22, 35, 57)) });
-        var secondary = ivory || midnight ? ink : DateText.Foreground;
+        var secondary = ivory || midnight || longhorn ? ink : DateText.Foreground;
         for (int i = 0; i < 60; i++)
         {
             double a = i * Math.PI / 30;
@@ -317,7 +346,7 @@ public partial class MainWindow : Window
     {
         if (SystemGadget.Visibility != Visibility.Visible) { previousKernel = 0; return; }
         if (DateTime.UtcNow < nextPerformanceUpdate) return;
-        nextPerformanceUpdate = DateTime.UtcNow.AddSeconds(2);
+        nextPerformanceUpdate = DateTime.UtcNow.AddSeconds(Math.Clamp(state.PerformanceInterval, 1, 10));
         if (GetSystemTimes(out ulong idle, out ulong kernel, out ulong user))
         {
             ulong total = kernel - previousKernel + user - previousUser;
@@ -342,54 +371,63 @@ public partial class MainWindow : Window
     }
 
     private DateTime lastDate;
+    private DateTime selectedCalendarDate = DateTime.Today;
     private void RenderCalendar()
     {
         lastDate = DateTime.Today;
-        MonthText.Text = month.ToString("MMMM yyyy");
-        CalendarTodayText.Text = DateTime.Today.ToString("ddd, d MMM");
+        MonthText.Text = month.ToString(state.LonghornMode ? "MMM yyyy" : "MMMM yyyy");
+        ToolTipService.SetToolTip(MonthText, month.ToString("MMMM yyyy"));
+        CalendarTodayText.Text = selectedCalendarDate.ToString("ddd, d MMM");
         CalendarGrid.Children.Clear(); CalendarGrid.ColumnDefinitions.Clear(); CalendarGrid.RowDefinitions.Clear();
         for (int i = 0; i < 7; i++) CalendarGrid.ColumnDefinitions.Add(new ColumnDefinition());
         var culture = CultureInfo.CurrentCulture.DateTimeFormat;
-        int first = (int)culture.FirstDayOfWeek;
+        int first = state.CalendarFirstDay == "Sunday" ? 0 : state.CalendarFirstDay == "Monday" ? 1 : (int)culture.FirstDayOfWeek;
         int offset = ((int)month.DayOfWeek - first + 7) % 7;
-        int rows = 1 + (offset + DateTime.DaysInMonth(month.Year, month.Month) + 6) / 7;
-        for (int i = 0; i < rows; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(state.LonghornMode ? 23 : 28) });
+        // Six complete weeks keep the card still when switching months.
+        for (int i = 0; i < 7; i++) CalendarGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(state.LonghornMode ? 20 : 28) });
         for (int i = 0; i < 7; i++) AddDay(culture.GetShortestDayName((DayOfWeek)((i + first) % 7)), 0, i, false);
-        for (int day = 1; day <= DateTime.DaysInMonth(month.Year, month.Month); day++)
+        DateTime gridStart = month.AddDays(-offset);
+        for (int cell = 0; cell < 42; cell++)
         {
-            int cell = offset + day - 1;
-            AddDay(day.ToString(), cell / 7 + 1, cell % 7, month.AddDays(day - 1) == DateTime.Today);
+            DateTime date = gridStart.AddDays(cell);
+            if (!state.CalendarAdjacentDays && date.Month != month.Month) continue;
+            bool today = date == DateTime.Today;
+            var day = new Button { Content = date.Day.ToString(), FontSize = state.LonghornMode ? 11 : 12, Padding = new Thickness(0), MinWidth = 0, MinHeight = 0, Height = state.LonghornMode ? 20 : 28, HorizontalAlignment = HorizontalAlignment.Stretch, CornerRadius = new CornerRadius(4), Background = new SolidColorBrush(Colors.Transparent), BorderThickness = new Thickness(date == selectedCalendarDate ? 1 : 0), BorderBrush = CpuBar.Foreground, Opacity = date.Month == month.Month ? 1 : 0.4 };
+            if (today) { day.Background = CpuBar.Foreground; day.Foreground = new SolidColorBrush(Colors.White); day.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold; }
+            AutomationProperties.SetName(day, date.ToString("D")); ToolTipService.SetToolTip(day, date.ToString("D"));
+            day.Click += (_, _) => { selectedCalendarDate = date; if (date.Month != month.Month || date.Year != month.Year) month = new DateTime(date.Year, date.Month, 1); RenderCalendar(); };
+            Grid.SetRow(day, cell / 7 + 1); Grid.SetColumn(day, cell % 7); CalendarGrid.Children.Add(day);
         }
     }
 
     private void AddDay(string text, int row, int column, bool today)
     {
         var label = new TextBlock { Text = text, FontSize = row == 0 ? 10 : 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
-        var border = new Border { Child = label, CornerRadius = new CornerRadius(14), MinWidth = 22, Height = state.LonghornMode ? 23 : 28 };
+        var border = new Border { Child = label, CornerRadius = new CornerRadius(14), MinWidth = state.LonghornMode ? 16 : 22, Height = state.LonghornMode ? 20 : 28 };
         if (row == 0) label.Opacity = 0.6;
         if (today) { label.FontWeight = Microsoft.UI.Text.FontWeights.SemiBold; border.Background = CpuBar.Foreground; label.Foreground = new SolidColorBrush(Colors.White); }
         Grid.SetRow(border, row); Grid.SetColumn(border, column); CalendarGrid.Children.Add(border);
     }
     private void PreviousMonth_Click(object sender, RoutedEventArgs e) { month = month.AddMonths(-1); RenderCalendar(); }
     private void NextMonth_Click(object sender, RoutedEventArgs e) { month = month.AddMonths(1); RenderCalendar(); }
-    private void Today_Click(object sender, RoutedEventArgs e) { month = new(DateTime.Today.Year, DateTime.Today.Month, 1); RenderCalendar(); }
+    private void Today_Click(object sender, RoutedEventArgs e) { selectedCalendarDate = DateTime.Today; month = new(DateTime.Today.Year, DateTime.Today.Month, 1); RenderCalendar(); }
     private void Notes_Changed(object sender, TextChangedEventArgs e) { if (!ready) return; state.Notes = NotesBox.Text; SaveStatus.Text = "Saving…"; saveTimer.Stop(); saveTimer.Start(); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
     private async void Add_Click(object sender, RoutedEventArgs e)
     {
-        if (dialogOpen) { preferencesWindow?.Activate(); return; }
+        if (dialogOpen) { ActivatePreferences(); return; }
         var panel = new StackPanel { Spacing = 12 };
-        panel.Children.Add(new TextBlock { Text = "Choose gadgets and arrange their page order.", TextWrapping = TextWrapping.Wrap });
+        panel.Children.Add(new TextBlock { Text = state.LonghornMode ? "Choose tiles and their order in the Longhorn rail. The bottom clock can also be dragged into the tile area." : "Choose gadgets and arrange their page order.", TextWrapping = TextWrapping.Wrap });
         var list = new StackPanel { Spacing = 8 };
         panel.Children.Add(list);
         void RenderOrder()
         {
             list.Children.Clear();
-            for (int index = 0; index < state.GadgetOrder.Count; index++)
+            for (int index = 0; index < ActiveGadgetOrder.Count; index++)
             {
                 int position = index;
-                string id = state.GadgetOrder[index];
+                string id = ActiveGadgetOrder[index];
                 var row = new Grid { ColumnSpacing = 4 };
                 row.ColumnDefinitions.Add(new ColumnDefinition());
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -400,10 +438,10 @@ public partial class MainWindow : Window
                 for (int direction = -1; direction <= 1; direction += 2)
                 {
                     int step = direction;
-                    var button = new Button { Content = new FontIcon { Glyph = step < 0 ? "\uE70E" : "\uE70D", FontSize = 12 }, Padding = new Thickness(8), IsEnabled = position + step >= 0 && position + step < state.GadgetOrder.Count };
+                    var button = new Button { Content = new FontIcon { Glyph = step < 0 ? "\uE70E" : "\uE70D", FontSize = 12 }, Padding = new Thickness(8), IsEnabled = position + step >= 0 && position + step < ActiveGadgetOrder.Count };
                     AutomationProperties.SetName(button, $"Move {id} {(step < 0 ? "up" : "down")}");
                     ToolTipService.SetToolTip(button, step < 0 ? "Move up" : "Move down");
-                    button.Click += (_, _) => { (state.GadgetOrder[position], state.GadgetOrder[position + step]) = (state.GadgetOrder[position + step], state.GadgetOrder[position]); ApplyState(); Save(); RenderOrder(); };
+                    button.Click += (_, _) => { (ActiveGadgetOrder[position], ActiveGadgetOrder[position + step]) = (ActiveGadgetOrder[position + step], ActiveGadgetOrder[position]); if (state.LonghornMode && id == "Clock") state.LonghornBottomClock = false; ApplyState(); Save(); RenderOrder(); };
                     Grid.SetColumn(button, step < 0 ? 1 : 2); row.Children.Add(button);
                 }
                 list.Children.Add(row);
@@ -415,61 +453,21 @@ public partial class MainWindow : Window
 
     private async void Settings_Click(object sender, RoutedEventArgs e)
     {
-        if (dialogOpen) { preferencesWindow?.Activate(); return; }
-        var panel = new StackPanel { Spacing = 12 };
-        var theme = new ComboBox { Header = "Theme", ItemsSource = new[] { "System", "Light", "Dark" }, SelectedItem = state.Theme, HorizontalAlignment = HorizontalAlignment.Stretch };
-        theme.SelectionChanged += (_, _) =>
-        {
-            if (theme.SelectedItem is not string selected || state.Theme == selected) return;
-            state.Theme = selected;
-            // Appearance changes do not reparent gadgets or change appbar geometry.
-            SynchronizeAppearance();
-            QueueAppearanceRefresh();
-            Save();
-        };
-        panel.Children.Add(theme);
-        var material = new ComboBox { Header = "Material", ItemsSource = new[] { "Acrylic", "Mica" }, SelectedItem = state.Material, HorizontalAlignment = HorizontalAlignment.Stretch };
-        material.SelectionChanged += (_, _) => { state.Material = (string)material.SelectedItem; ApplyState(); Save(); };
-        panel.Children.Add(material);
-        var width = new NumberBox { Header = "Width", Minimum = 220, Maximum = 360, Value = state.Width, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
-        width.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { state.Width = (int)args.NewValue; PositionSidebar(); UpdateClassicGadgets(); Save(); } };
-        panel.Children.Add(width);
-        AddToggle(panel, "Compact clock", state.CompactClock, v => { state.CompactClock = v; state.ClockSize = 0; });
-        AddToggle(panel, "Auto-hide at screen edge", state.AutoHide, v => state.AutoHide = v);
-        var clockStyle = new ComboBox { Header = "Clock style", ItemsSource = new[] { "Analog + digital", "Analog", "Digital" }, SelectedItem = state.ClockStyle, HorizontalAlignment = HorizontalAlignment.Stretch };
-        clockStyle.SelectionChanged += (_, _) => { state.ClockStyle = (string)clockStyle.SelectedItem; ApplyState(); Save(); };
-        panel.Children.Add(clockStyle);
-        AddToggle(panel, "Show digital seconds", state.ShowSeconds, v => state.ShowSeconds = v);
-        var density = new NumberBox { Header = "Gadgets per page", Minimum = 1, Maximum = 3, Value = state.GadgetsPerPage, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
-        density.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { state.GadgetsPerPage = (int)args.NewValue; ApplyGadgetPage(); Save(); } };
-        panel.Children.Add(density);
-        var noteHeight = new NumberBox { Header = "Note height", Minimum = 72, Maximum = 240, Value = state.NoteHeight, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
-        noteHeight.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { state.NoteHeight = (int)args.NewValue; ApplyState(); Save(); } };
-        panel.Children.Add(noteHeight);
-        var slideInterval = new NumberBox { Header = "Slide show interval (seconds)", Minimum = 5, Maximum = 120, Value = state.SlideInterval, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
-        slideInterval.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { state.SlideInterval = (int)args.NewValue; UpdateClassicGadgets(); Save(); } };
-        panel.Children.Add(slideInterval);
-        var longhorn = new ToggleSwitch { Header = "Longhorn mode", IsOn = state.LonghornMode };
-        longhorn.Toggled += async (_, _) => { state.LonghornMode = longhorn.IsOn; Save(); await UpdateLonghornAsync(); };
-        panel.Children.Add(longhorn);
-        var replace = new ToggleSwitch { Header = "Hide Windows taskbar in Longhorn mode", IsOn = state.LonghornHideTaskbar };
-        replace.Toggled += async (_, _) => { state.LonghornHideTaskbar = replace.IsOn; Save(); if (shellBridge is not null) await shellBridge.SendAsync(new { action = "replace", enabled = state.LonghornHideTaskbar }); };
-        panel.Children.Add(replace);
-        panel.Children.Add(new TextBlock { Text = "Longhorn mode adds running apps and a hosted tray. Explorer keeps the desktop. Restore Windows taskbar is always available.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
-        AddToggle(panel, "Start with Windows", StartupPreference.Enabled, SetStartup);
-        var side = new ToggleSwitch { Header = "Place on the left", IsOn = state.Left };
-        side.Toggled += async (_, _) => await MoveSidebarAsync(side.IsOn);
-        panel.Children.Add(side);
-        AddToggle(panel, "Keep above other windows", state.AlwaysOnTop, v => state.AlwaysOnTop = v);
-        panel.Children.Add(new TextBlock { Text = "Sidebar reserves this screen edge. Maximized windows fit beside it. Closing Sidebar restores the space.", TextWrapping = TextWrapping.Wrap, MaxWidth = 250 });
-        panel.Children.Add(new TextBlock { Text = "Notes and preferences are saved on this device.", TextWrapping = TextWrapping.Wrap, MaxWidth = 280 });
-        await ShowDialog("Settings", panel);
+        if (dialogOpen) { ActivatePreferences(); return; }
+        await ShowDialog("Settings", BuildSettingsContent());
     }
-
     private void AddToggle(StackPanel panel, string title, bool value, Action<bool> change)
     {
         var toggle = new ToggleSwitch { Header = title, IsOn = value };
-        toggle.Toggled += (_, _) => { change(toggle.IsOn); ApplyState(); Save(); };
+        bool applied = value;
+        toggle.Toggled += (_, _) =>
+        {
+            if (toggle.IsOn == applied) return;
+            bool previous = applied; applied = toggle.IsOn;
+            try { change(applied); ApplyState(); RenderCalendar(); RefreshQuickLaunch(); Save(); }
+            catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or COMException or System.Security.SecurityException)
+            { applied = previous; toggle.IsOn = previous; PanelStatus.Text = "Windows could not save that setting. Your previous selection is kept."; PanelStatus.Visibility = Visibility.Visible; }
+        };
         panel.Children.Add(toggle);
     }
 
@@ -485,7 +483,7 @@ public partial class MainWindow : Window
         if (dialogOpen) return;
         dialogOpen = true;
         var completion = new TaskCompletionSource<bool>();
-        var window = new Window { Title = $"Windows Sidebar Fluent — {title}", SystemBackdrop = new SidebarBackdrop(true) };
+        var window = new Window { Title = $"FluentSidebar — {title}", SystemBackdrop = new SidebarBackdrop(state.Material == "Mica") };
         try { window.AppWindow.IsShownInSwitchers = false; }
         catch (Exception ex) when (ex is NotImplementedException or COMException) { /* The owner window below also excludes this dialog from the taskbar. */ }
         preferencesWindow = window;
@@ -494,15 +492,15 @@ public partial class MainWindow : Window
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         layout.Children.Add(new TextBlock { Text = title, FontSize = 24, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        var scroll = new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        Grid.SetRow(scroll, 1); layout.Children.Add(scroll);
+        FrameworkElement body = content is Pivot pivot ? pivot : new ScrollViewer { Content = content, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Grid.SetRow(body, 1); layout.Children.Add(body);
         var done = new Button { Content = "Done", HorizontalAlignment = HorizontalAlignment.Right };
         done.Click += (_, _) => window.Close(); Grid.SetRow(done, 2); layout.Children.Add(done);
         var windowRoot = new Grid { RequestedTheme = Root.RequestedTheme };
         windowRoot.Background = SurfaceBrush(Root.RequestedTheme, 224);
         windowRoot.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         windowRoot.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var titleBar = new TitleBar { Title = "Windows Sidebar Fluent" };
+        var titleBar = new TitleBar { Title = "FluentSidebar" };
         windowRoot.Children.Add(titleBar);
         Grid.SetRow(layout, 1); windowRoot.Children.Add(layout);
         window.Content = windowRoot;
@@ -519,7 +517,7 @@ public partial class MainWindow : Window
         SetWindowLongPtr(hwnd, -8, WinRT.Interop.WindowNative.GetWindowHandle(this));
         var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         double scale = GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96d;
-        int width = Math.Min((int)(400 * scale), area.Width - 24);
+        int width = Math.Min((int)((content is Pivot ? 540 : 420) * scale), area.Width - 24);
         int height = Math.Min((int)(640 * scale), area.Height - 24);
         window.AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(area.X + (area.Width - width) / 2, area.Y + (area.Height - height) / 2, width, height));
         RevealSidebar();
@@ -539,6 +537,11 @@ public partial class MainWindow : Window
             var item = new MenuFlyoutItem { Text = title };
             item.Click += (_, _) => action(); menu.Items.Add(item);
         }
+        for (DependencyObject? node = e.OriginalSource as DependencyObject; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            string? id = state.GadgetOrder.FirstOrDefault(id => ReferenceEquals(GadgetElement(id), node));
+            if (id is not null) { string selected = id; Item($"Customize {id}…", () => CustomizeCard(selected)); break; }
+        }
         Item("Categories and gadgets…", () => Add_Click(this, new RoutedEventArgs()));
         Item("Settings…", () => Settings_Click(this, new RoutedEventArgs()));
         Item("Customize clock…", () => CustomizeClock_Click(this, new RoutedEventArgs()));
@@ -551,8 +554,13 @@ public partial class MainWindow : Window
         top.Click += (_, _) => { state.AlwaysOnTop = top.IsChecked; ApplyState(); Save(); };
         menu.Items.Add(top);
         menu.Items.Add(new MenuFlyoutSeparator());
-        if (state.LonghornMode) Item("Restore Windows taskbar", () => RestoreTaskbar_Click(this, new RoutedEventArgs()));
-        Item("Exit Windows Sidebar Fluent", Close);
+        if (state.LonghornMode)
+        {
+            var keepTaskbar = new ToggleMenuFlyoutItem { Text = "Keep Windows taskbar visible", IsChecked = !state.LonghornHideTaskbar };
+            keepTaskbar.Click += async (_, _) => { state.LonghornHideTaskbar = !keepTaskbar.IsChecked; ApplyLonghornSections(); Save(); await UpdateTaskbarOptionsAsync(); };
+            menu.Items.Add(keepTaskbar);
+        }
+        Item("Exit FluentSidebar", Close);
         menu.Opened += (_, _) => { sidebarMenuOpen = true; hideTimer.Stop(); };
         menu.Closed += (_, _) => { sidebarMenuOpen = false; QueueAutoHide(); };
         menu.ShowAt(Root, e.GetPosition(Root));
@@ -636,7 +644,8 @@ public partial class MainWindow : Window
             if (remaining <= TimeSpan.Zero)
             {
                 TimerText.Text = "Time is up"; timerDeadline = null; pausedTimer = TimeSpan.Zero; TimerStart.Content = "Start";
-                MessageBeep(0x40);
+                if (state.TimerSound) MessageBeep(0x40);
+                AddLocalNotification("Timer", "Your timer has finished.");
             }
             else TimerText.Text = $"{(int)remaining.TotalMinutes:00}:{remaining.Seconds:00}";
         }
@@ -644,11 +653,11 @@ public partial class MainWindow : Window
         nextStatusUpdate = DateTime.UtcNow.AddSeconds(30);
         try
         {
-            var drive = new System.IO.DriveInfo(System.IO.Path.GetPathRoot(Environment.SystemDirectory)!);
+            var drive = new System.IO.DriveInfo(string.IsNullOrWhiteSpace(state.StorageDrive) ? System.IO.Path.GetPathRoot(Environment.SystemDirectory)! : state.StorageDrive);
             StorageText.Text = $"{drive.Name}  {drive.AvailableFreeSpace / 1073741824d:0.0} GB free of {drive.TotalSize / 1073741824d:0.0} GB";
             StorageBar.Value = 100d * (drive.TotalSize - drive.AvailableFreeSpace) / drive.TotalSize;
         }
-        catch (System.IO.IOException) { StorageText.Text = "Storage unavailable"; }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or ArgumentException) { StorageText.Text = "Storage unavailable"; }
     }
 
     private void Save()
@@ -683,6 +692,28 @@ public sealed class SidebarState
     public bool CompactClock { get; set; } = true;
     public bool LonghornMode { get; set; }
     public bool LonghornHideTaskbar { get; set; }
+    public bool LonghornHideSystemTray { get; set; } = true;
+    public int LonghornWidth { get; set; } = 168;
+    public bool LonghornBottomClock { get; set; } = true;
+    public bool LonghornShowPins { get; set; } = true;
+    public bool LonghornTrayExpanded { get; set; }
+    public Dictionary<string, GadgetCardStyle> CardStyles { get; set; } = new();
+    public bool CalendarAdjacentDays { get; set; } = true;
+    public string CalendarFirstDay { get; set; } = "System";
+    public bool CalendarTodayButton { get; set; } = true;
+    public int NotesFontSize { get; set; } = 14;
+    public int PerformanceInterval { get; set; } = 2;
+    public bool TimerSound { get; set; } = true;
+    public int TimerDuration { get; set; } = 5;
+    public string StorageDrive { get; set; } = "";
+    public string SlideFit { get; set; } = "Fill";
+    public bool SlideShowName { get; set; } = true;
+    public bool PuzzleShowMoves { get; set; } = true;
+    public int FeedCount { get; set; } = 5;
+    public int FeedRefreshMinutes { get; set; } = 15;
+    public int LaunchColumns { get; set; } = 4;
+    public int LaunchIconSize { get; set; } = 28;
+    public List<string> LonghornGadgetOrder { get; set; } = ["Calendar", "Notes", "Slide show", "Feed headlines", "Performance", "Timer", "Storage", "Picture puzzle", "Quick launch", "Clock"];
     public bool AutoHide { get; set; }
     public string ClockStyle { get; set; } = "Analog + digital";
     public bool ShowSeconds { get; set; }

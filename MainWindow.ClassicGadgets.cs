@@ -20,6 +20,10 @@ public partial class MainWindow
     private int slideIndex;
     private int puzzleRenderWidth;
     private BitmapImage? puzzlePicture;
+    private BitmapImage? renderedPuzzlePicture;
+    private readonly Dictionary<int, Button> puzzleButtons = new();
+    private double puzzleCellSize;
+    private bool renderedPuzzleRail;
     private DateTime nextFeedRefresh;
 
     private void InitializeClassicGadgets()
@@ -42,7 +46,7 @@ public partial class MainWindow
             if (!slidePaused && slideFiles.Length > 1) slideTimer.Start(); else slideTimer.Stop();
         }
         else slideTimer.Stop();
-        if (PuzzleGadget.Visibility == Visibility.Visible && (!puzzleRendered || puzzleRenderWidth != state.Width))
+        if (PuzzleGadget.Visibility == Visibility.Visible && (!puzzleRendered || puzzleRenderWidth != SidebarWidth || renderedPuzzleRail != state.LonghornMode))
         {
             if (!puzzleRendered && System.IO.File.Exists(state.PuzzlePicture)) LoadPuzzleImage(state.PuzzlePicture);
             RenderPuzzle();
@@ -96,28 +100,54 @@ public partial class MainWindow
 
     private void RenderPuzzle()
     {
-        puzzleRenderWidth = state.Width;
-        puzzleRendered = true; PuzzleBoard.Children.Clear(); PuzzleBoard.RowDefinitions.Clear(); PuzzleBoard.ColumnDefinitions.Clear();
-        double size = Math.Clamp(state.Width - 48, 140, 260), cell = (size - 4) / 3;
+        puzzleRenderWidth = SidebarWidth;
+        renderedPuzzleRail = state.LonghornMode;
+        double size = Math.Clamp(SidebarWidth - (state.LonghornMode ? 24 : 48), 100, 260), cell = (size - 4) / 3;
+        bool rebuild = !puzzleRendered || puzzleCellSize != cell || !ReferenceEquals(renderedPuzzlePicture, puzzlePicture);
+        if (rebuild)
+        {
+            PuzzleBoard.Children.Clear(); PuzzleBoard.RowDefinitions.Clear(); PuzzleBoard.ColumnDefinitions.Clear(); puzzleButtons.Clear();
+            for (int i = 0; i < 3; i++) { PuzzleBoard.RowDefinitions.Add(new RowDefinition()); PuzzleBoard.ColumnDefinitions.Add(new ColumnDefinition()); }
+            puzzleCellSize = cell; renderedPuzzlePicture = puzzlePicture;
+        }
+        puzzleRendered = true;
         PuzzleBoard.Width = PuzzleBoard.Height = size;
-        for (int i = 0; i < 3; i++) { PuzzleBoard.RowDefinitions.Add(new RowDefinition()); PuzzleBoard.ColumnDefinitions.Add(new ColumnDefinition()); }
+        int blank = Array.IndexOf(picturePuzzle.Tiles, 0);
         for (int index = 0; index < 9; index++)
         {
-            int position = index, tile = picturePuzzle.Tiles[index];
+            int tile = picturePuzzle.Tiles[index];
             if (tile == 0) continue;
-            object content = tile.ToString();
-            if (puzzlePicture is not null)
+            if (!puzzleButtons.TryGetValue(tile, out var button))
             {
-                var crop = new Grid { Width = cell, Height = cell, Clip = new RectangleGeometry { Rect = new Rect(0, 0, cell, cell) } };
-                var image = new Image { Source = puzzlePicture, Width = size, Height = size, Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, RenderTransform = new TranslateTransform { X = -((tile - 1) % 3) * size / 3, Y = -((tile - 1) / 3) * size / 3 } };
-                crop.Children.Add(image); content = crop;
+                object content = new TextBlock { Text = tile.ToString(), FontSize = 20, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+                if (puzzlePicture is not null)
+                {
+                    var crop = new Grid { Width = cell, Height = cell, Clip = new RectangleGeometry { Rect = new Rect(0, 0, cell, cell) } };
+                    var image = new Image { Source = puzzlePicture, Width = size, Height = size, Stretch = Stretch.UniformToFill, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, RenderTransform = new TranslateTransform { X = -((tile - 1) % 3) * size / 3, Y = -((tile - 1) / 3) * size / 3 } };
+                    crop.Children.Add(image); content = crop;
+                }
+                button = new Button { Content = content, Padding = new Thickness(0), MinWidth = 0, MinHeight = 0, CornerRadius = new CornerRadius(4), HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch, BorderBrush = CpuBar.Foreground };
+                int number = tile;
+                button.Click += (_, _) => { if (picturePuzzle.Move(Array.IndexOf(picturePuzzle.Tiles, number))) { PersistPuzzle(); RenderPuzzle(); } };
+                Microsoft.UI.Xaml.Hosting.ElementCompositionPreview.SetIsTranslationEnabled(button, true);
+                puzzleButtons[tile] = button; PuzzleBoard.Children.Add(button);
             }
-            var button = new Button { Content = content, Padding = new Thickness(0), MinWidth = 0, MinHeight = 0, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Stretch };
-            AutomationProperties.SetName(button, $"Puzzle tile {tile}");
-            button.Click += (_, _) => { if (picturePuzzle.Move(position)) { PersistPuzzle(); RenderPuzzle(); } };
-            Grid.SetRow(button, index / 3); Grid.SetColumn(button, index % 3); PuzzleBoard.Children.Add(button);
+            int oldRow = Grid.GetRow(button), oldColumn = Grid.GetColumn(button);
+            bool movable = Math.Abs(index / 3 - blank / 3) + Math.Abs(index % 3 - blank % 3) == 1;
+            button.BorderThickness = new Thickness(movable ? 1 : 0); button.Opacity = movable || puzzlePicture is not null ? 1 : 0.75;
+            AutomationProperties.SetName(button, $"Puzzle tile {tile}{(movable ? ", can move" : "")}");
+            Grid.SetRow(button, index / 3); Grid.SetColumn(button, index % 3);
+            if (!rebuild && windowsAppearance.AnimationsEnabled && (oldRow != index / 3 || oldColumn != index % 3))
+            {
+                var visual = Microsoft.UI.Xaml.Hosting.ElementCompositionPreview.GetElementVisual(button);
+                var move = visual.Compositor.CreateVector3KeyFrameAnimation();
+                move.InsertKeyFrame(0, new System.Numerics.Vector3((float)((oldColumn - index % 3) * (cell + 2)), (float)((oldRow - index / 3) * (cell + 2)), 0));
+                move.InsertKeyFrame(1, System.Numerics.Vector3.Zero, visual.Compositor.CreateCubicBezierEasingFunction(new System.Numerics.Vector2(0.2f, 0), new System.Numerics.Vector2(0, 1)));
+                move.Duration = TimeSpan.FromMilliseconds(150); visual.StartAnimation("Translation", move);
+            }
         }
-        PuzzleStatus.Text = picturePuzzle.Solved ? $"Solved in {picturePuzzle.Moves} moves" : $"{picturePuzzle.Moves} moves · slide a tile into the gap";
+        PuzzleStatus.Text = picturePuzzle.Solved ? $"Solved · {picturePuzzle.Moves} moves" : $"{picturePuzzle.Moves} moves";
+        ToolTipService.SetToolTip(PuzzleBoard, "Slide an outlined tile into the empty space.");
     }
     private void PersistPuzzle() { state.PuzzleTiles = picturePuzzle.Tiles.ToArray(); state.PuzzleMoves = picturePuzzle.Moves; Save(); }
     private void PuzzleShuffle_Click(object sender, RoutedEventArgs e) { picturePuzzle.Shuffle(); PersistPuzzle(); RenderPuzzle(); }
@@ -147,7 +177,7 @@ public partial class MainWindow
 
     private async void ConfigureFeed_Click(object sender, RoutedEventArgs e)
     {
-        if (dialogOpen) { preferencesWindow?.Activate(); return; }
+        if (dialogOpen) { ActivatePreferences(); return; }
         var panel = new StackPanel { Spacing = 12 };
         var url = new TextBox { Header = "RSS or Atom feed address", PlaceholderText = "https://…", Text = state.FeedUrl };
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
@@ -173,13 +203,13 @@ public partial class MainWindow
         feedLoading = true; FeedStatus.Text = "Updating…";
         try
         {
-            var headlines = await FeedReader.FetchAsync(uri, classicCancellation.Token);
+            var headlines = await FeedReader.FetchAsync(uri, classicCancellation.Token, state.FeedCount);
             if (sidebarClosed || state.FeedUrl != uri.AbsoluteUri) return;
             FeedItems.Children.Clear();
             foreach (var headline in headlines)
                 FeedItems.Children.Add(new HyperlinkButton { NavigateUri = headline.Link, Content = new TextBlock { Text = headline.Title, TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis, FontSize = 12 }, Padding = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Left });
             FeedStatus.Text = headlines.Count == 0 ? "No headlines found" : $"Updated {DateTime.Now:t}";
-            nextFeedRefresh = DateTime.UtcNow.AddMinutes(15);
+            nextFeedRefresh = DateTime.UtcNow.AddMinutes(Math.Clamp(state.FeedRefreshMinutes, 5, 120));
         }
         catch (OperationCanceledException) { if (!sidebarClosed) { FeedStatus.Text = "Feed request timed out"; nextFeedRefresh = DateTime.UtcNow.AddMinutes(5); } }
         catch (Exception ex) when (ex is HttpRequestException or System.IO.IOException or System.Xml.XmlException)

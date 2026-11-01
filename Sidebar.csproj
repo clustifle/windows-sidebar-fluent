@@ -5,8 +5,8 @@
     <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RootNamespace>Sidebar</RootNamespace>
-    <Version>1.1.1</Version>
-    <AssemblyName>Windows Sidebar Fluent</AssemblyName>
+    <Version>1.2.0</Version>
+    <AssemblyName>FluentSidebar</AssemblyName>
     <ApplicationIcon>Assets\Sidebar.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Platforms>x64</Platforms>
@@ -23,6 +23,9 @@
     <PackageReference Include="Microsoft.WindowsAppSDK.DWrite" Version="2.6.4" />
     <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.6.4" />
     <Content Include="Assets\Sidebar.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\Windows11Start.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\FluentOptions.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\FluentAlert.svg" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\FluentSystemIcons-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="THIRD_PARTY_NOTICES.md" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\ManagedShell-LICENSE.txt" CopyToPublishDirectory="PreserveNewest" />

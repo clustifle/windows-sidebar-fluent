@@ -16,14 +16,15 @@ public partial class MainWindow
         DateText.Visibility = state.ClockShowDate ? Visibility.Visible : Visibility.Collapsed;
         ClockCaption.Text = state.ClockLabel;
         ClockCaption.Visibility = string.IsNullOrWhiteSpace(state.ClockLabel) ? Visibility.Collapsed : Visibility.Visible;
-        ClockView.Width = ClockView.Height = state.ClockSize > 0 ? Math.Clamp(state.ClockSize, 64, 160) : state.CompactClock ? 80 : 120;
+        double preferredSize = state.ClockSize > 0 ? Math.Clamp(state.ClockSize, 64, 160) : state.LonghornMode ? 96 : state.CompactClock ? 80 : 120;
+        ClockView.Width = ClockView.Height = Math.Min(preferredSize, SidebarWidth - 28);
         clockDate = DateTime.MinValue;
         clockFaceDirty = true;
     }
 
     private void DrawClockNumerals(Brush ink)
     {
-        if (state.ClockFaceStyle is "Minimal" or "Railway") return;
+        if (state.ClockFaceStyle is "Minimal" or "Railway" or "Longhorn") return;
         string[] roman = ["XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
         for (int hour = 0; hour < 12; hour++)
         {
@@ -44,7 +45,7 @@ public partial class MainWindow
 
     private async void CustomizeClock_Click(object sender, RoutedEventArgs e)
     {
-        if (dialogOpen) { preferencesWindow?.Activate(); return; }
+        if (dialogOpen) { ActivatePreferences(); return; }
         var panel = new StackPanel { Spacing = 14 };
         Border Card(UIElement content)
         {
@@ -60,7 +61,7 @@ public partial class MainWindow
         Choice("Display", ["Analog + digital", "Analog", "Digital"], state.ClockStyle, v => state.ClockStyle = v);
         var faces = new Grid { ColumnSpacing = 8, RowSpacing = 8 };
         faces.ColumnDefinitions.Add(new ColumnDefinition()); faces.ColumnDefinitions.Add(new ColumnDefinition());
-        string[] faceNames = ["Minimal", "Classic", "Roman", "Railway", "Midnight", "Ivory"];
+        string[] faceNames = ["Minimal", "Classic", "Roman", "Railway", "Midnight", "Ivory", "Longhorn"];
         var faceButtons = new List<Button>();
         for (int i = 0; i < faceNames.Length; i++)
         {
@@ -81,6 +82,7 @@ public partial class MainWindow
         var size = new NumberBox { Header = "Clock size", Minimum = 64, Maximum = 160, Value = state.ClockSize > 0 ? state.ClockSize : state.CompactClock ? 80 : 120, SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact };
         size.ValueChanged += (_, args) => { if (!double.IsNaN(args.NewValue)) { state.ClockSize = (int)args.NewValue; ApplyState(); Save(); } };
         panel.Children.Add(Card(size));
+        if (state.LonghornMode) AddToggle(panel, "Dock at the bottom of the rail", state.LonghornBottomClock, v => state.LonghornBottomClock = v);
         AddToggle(panel, "Show second hand", state.ClockSecondHand, v => state.ClockSecondHand = v);
         AddToggle(panel, "Show digital seconds", state.ShowSeconds, v => state.ShowSeconds = v);
         AddToggle(panel, "Show date", state.ClockShowDate, v => state.ClockShowDate = v);

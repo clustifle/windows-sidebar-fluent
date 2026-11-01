@@ -19,6 +19,7 @@ internal sealed class DesktopAppBar : IDisposable
     private bool hasPosition;
     private int logicalWidth = 240;
     private bool autoHide, revealed = true, coverMonitor;
+    private double revealProgress = 1;
     private IntPtr explorerTaskbar;
 
     public DesktopAppBar(IntPtr hwnd, Action<Action> enqueue)
@@ -36,10 +37,10 @@ internal sealed class DesktopAppBar : IDisposable
     {
         left = onLeft;
         topmost = aboveWindows;
-        logicalWidth = Math.Clamp(width, 220, 360);
+        logicalWidth = Math.Clamp(width, 156, 360);
         autoHide = hideAutomatically;
         coverMonitor = fillMonitor;
-        if (!autoHide) revealed = true;
+        if (!autoHide) { revealed = true; revealProgress = 1; }
         Position();
         UpdateZOrder();
     }
@@ -47,7 +48,15 @@ internal sealed class DesktopAppBar : IDisposable
     public void SetRevealed(bool value)
     {
         revealed = value || !autoHide;
+        revealProgress = revealed ? 1 : 0;
         Position(); UpdateZOrder();
+    }
+
+    public void SetRevealProgress(double progress)
+    {
+        revealProgress = autoHide ? Math.Clamp(progress, 0, 1) : 1;
+        revealed = revealProgress > 0;
+        Position();
     }
 
     private AppBarData Data() => new() { Size = (uint)Marshal.SizeOf<AppBarData>(), Window = hwnd, CallbackMessage = callbackMessage };
@@ -96,10 +105,11 @@ internal sealed class DesktopAppBar : IDisposable
                 if (left) windowRect.Right = windowRect.Left + reservedWidth;
                 else windowRect.Left = windowRect.Right - reservedWidth;
             }
-            if (autoHide && revealed)
+            if (autoHide)
             {
-                if (left) windowRect.Right = windowRect.Left + width;
-                else windowRect.Left = windowRect.Right - width;
+                int visibleWidth = reservedWidth + (int)Math.Round((width - reservedWidth) * revealProgress);
+                if (left) windowRect.Right = windowRect.Left + visibleWidth;
+                else windowRect.Left = windowRect.Right - visibleWidth;
             }
             if (!GetWindowRect(hwnd, out var actual) || !actual.Equals(windowRect))
                 SetWindowPos(hwnd, IntPtr.Zero, windowRect.Left, windowRect.Top,

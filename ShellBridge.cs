@@ -7,12 +7,13 @@ internal sealed class ShellBridge : IAsyncDisposable
     private readonly Process process;
     private readonly SemaphoreSlim writeLock = new(1);
     private bool disposed;
+    private int disposing;
     public string LastError { get; private set; } = "";
     public ShellBridge(Action<string> update, Action ended)
     {
-        string path = Path.Combine(AppContext.BaseDirectory, "WindowsSidebar.ShellHost.exe");
+        string path = Path.Combine(AppContext.BaseDirectory, "FluentSidebar.ShellHost.exe");
         process = new Process { StartInfo = new ProcessStartInfo(path, Environment.ProcessId.ToString()) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true }, EnableRaisingEvents = true };
-        process.Exited += (_, _) => { if (!disposed) { Restore(); ended(); } };
+        process.Exited += (_, _) => { if (!disposed && Volatile.Read(ref disposing) == 0) { Restore(); ended(); } };
         process.Start();
         _ = Task.Run(async () =>
         {
@@ -31,13 +32,13 @@ internal sealed class ShellBridge : IAsyncDisposable
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(uint processId);
     public static void Restore()
     {
-        string path = Path.Combine(AppContext.BaseDirectory, "WindowsSidebar.ShellHost.exe");
+        string path = Path.Combine(AppContext.BaseDirectory, "FluentSidebar.ShellHost.exe");
         if (!File.Exists(path)) return;
         try { Process.Start(new ProcessStartInfo(path, "--restore") { UseShellExecute = false, CreateNoWindow = true }); } catch (System.ComponentModel.Win32Exception) { }
     }
     public async ValueTask DisposeAsync()
     {
-        if (disposed) return;
+        if (disposed || Interlocked.Exchange(ref disposing, 1) != 0) return;
         await SendAsync(new { action = "stop" }); disposed = true;
         try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(4)); }
         catch (TimeoutException) { process.Kill(); Restore(); }

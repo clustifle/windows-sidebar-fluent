@@ -1,16 +1,16 @@
 param(
-    [string]$PublishDirectory = (Join-Path $PSScriptRoot '..\artifacts\Windows Sidebar Fluent'),
+    [string]$PublishDirectory = (Join-Path $PSScriptRoot '..\artifacts\FluentSidebar'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot '..\artifacts\installer'),
-    [string]$Version = '1.1.1',
+    [string]$Version = '1.2.0',
     [string]$WixPath = 'wix'
 )
 $ErrorActionPreference = 'Stop'
 $publishRoot = (Resolve-Path -LiteralPath $PublishDirectory).Path
-if (-not (Test-Path -LiteralPath (Join-Path $publishRoot 'Windows Sidebar Fluent.exe'))) { throw 'Publish the app before building its installer.' }
+if (-not (Test-Path -LiteralPath (Join-Path $publishRoot 'FluentSidebar.exe'))) { throw 'Publish the app before building its installer.' }
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 $outputRoot = (Resolve-Path -LiteralPath $OutputDirectory).Path
 $wxsPath = Join-Path $outputRoot 'WindowsSidebarFluent.wxs'
-$msiPath = Join-Path $outputRoot "WindowsSidebarFluent-$Version-x64.msi"
+$msiPath = Join-Path $outputRoot "FluentSidebar-$Version-x64.msi"
 
 function StableId([string]$prefix, [string]$path) {
     $hash = [System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes($path.ToLowerInvariant()))
@@ -43,8 +43,8 @@ function WriteDirectories([string]$folder) {
 }
 try {
     Write-WixStart 'Wix' @{}
-    Write-WixStart 'Package' @{Name='Windows Sidebar Fluent';Manufacturer='Clustifle';Version=$Version;UpgradeCode='01B63E60-D4A6-4CF9-A078-283CA64D96BA';Scope='perUser';Language='1033';InstallerVersion='500'}
-    Element 'MajorUpgrade' @{DowngradeErrorMessage='A newer version of Windows Sidebar Fluent is already installed.'}
+    Write-WixStart 'Package' @{Name='FluentSidebar';Manufacturer='Clustifle';Version=$Version;UpgradeCode='01B63E60-D4A6-4CF9-A078-283CA64D96BA';Scope='perUser';Language='1033';InstallerVersion='500'}
+    Element 'MajorUpgrade' @{DowngradeErrorMessage='A newer version of FluentSidebar is already installed.'}
     Element 'MediaTemplate' @{EmbedCab='yes';CompressionLevel='high'}
     Element 'Icon' @{Id='SidebarIcon';SourceFile=(Join-Path $publishRoot 'Assets\Sidebar.ico')}
     Element 'Property' @{Id='ARPPRODUCTICON';Value='SidebarIcon'}
@@ -52,12 +52,12 @@ try {
     Element 'Property' @{Id='ARPNOMODIFY';Value='1'}
     Write-WixStart 'StandardDirectory' @{Id='LocalAppDataFolder'}
     Write-WixStart 'Directory' @{Id='UserProgramsFolder';Name='Programs'}
-    Write-WixStart 'Directory' @{Id='INSTALLFOLDER';Name='Windows Sidebar Fluent'}
+    Write-WixStart 'Directory' @{Id='INSTALLFOLDER';Name='FluentSidebar'}
     WriteDirectories $publishRoot
     $writer.WriteEndElement(); $writer.WriteEndElement(); $writer.WriteEndElement()
     Element 'StandardDirectory' @{Id='DesktopFolder'}
     Element 'StandardDirectory' @{Id='ProgramMenuFolder'}
-    Write-WixStart 'Feature' @{Id='MainFeature';Title='Windows Sidebar Fluent';Level='1'}
+    Write-WixStart 'Feature' @{Id='MainFeature';Title='FluentSidebar';Level='1'}
     Element 'ComponentGroupRef' @{Id='ApplicationFiles'}
     Element 'ComponentRef' @{Id='ApplicationShortcuts'}
     $writer.WriteEndElement(); $writer.WriteEndElement()
@@ -76,8 +76,8 @@ try {
     }
     $writer.WriteEndElement()
     Write-WixStart 'Component' @{Id='ApplicationShortcuts';Directory='INSTALLFOLDER';Guid=(StableGuid 'ApplicationShortcuts');Bitness='always64'}
-    Element 'Shortcut' @{Id='DesktopShortcut';Directory='DesktopFolder';Name='Windows Sidebar Fluent';Target='[INSTALLFOLDER]Windows Sidebar Fluent.exe';WorkingDirectory='INSTALLFOLDER';Icon='SidebarIcon';Advertise='no'}
-    Element 'Shortcut' @{Id='StartMenuShortcut';Directory='ProgramMenuFolder';Name='Windows Sidebar Fluent';Target='[INSTALLFOLDER]Windows Sidebar Fluent.exe';WorkingDirectory='INSTALLFOLDER';Icon='SidebarIcon';Advertise='no'}
+    Element 'Shortcut' @{Id='DesktopShortcut';Directory='DesktopFolder';Name='FluentSidebar';Target='[INSTALLFOLDER]FluentSidebar.exe';WorkingDirectory='INSTALLFOLDER';Icon='SidebarIcon';Advertise='no'}
+    Element 'Shortcut' @{Id='StartMenuShortcut';Directory='ProgramMenuFolder';Name='FluentSidebar';Target='[INSTALLFOLDER]FluentSidebar.exe';WorkingDirectory='INSTALLFOLDER';Icon='SidebarIcon';Advertise='no'}
     Element 'RegistryValue' @{Root='HKCU';Key='Software\Clustifle\Windows Sidebar Fluent\Installer';Name='Shortcuts';Type='integer';Value='1';KeyPath='yes'}
     foreach ($directoryId in @($directories.Values) + @('UserProgramsFolder')) { Element 'RemoveFolder' @{Id=('Remove_'+$directoryId);Directory=$directoryId;On='uninstall'} }
     $writer.WriteEndElement(); $writer.WriteEndElement(); $writer.WriteEndElement()

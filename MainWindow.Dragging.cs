@@ -21,9 +21,11 @@ public partial class MainWindow
         {
             var gadget = (Border)GadgetElement(id);
             var content = gadget.Child;
+            RegisterGadgetHeading(id, content);
             gadget.Child = null;
             var layout = new Grid();
-            layout.Children.Add(content);
+            // Content scrolls inside a stable tile instead of resizing the rail.
+            layout.Children.Add(new ScrollViewer { Content = content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalScrollMode = ScrollMode.Disabled, VerticalScrollMode = ScrollMode.Auto });
             var insertion = new Border { Height = 2, Background = CpuBar.Foreground, VerticalAlignment = VerticalAlignment.Top, IsHitTestVisible = false, Visibility = Visibility.Collapsed };
             insertionMarkers.Add(insertion);
             gadget.CanDrag = true;
@@ -73,9 +75,10 @@ public partial class MainWindow
                 if (source != id)
                 {
                     bool after = args.GetPosition(gadget).Y > gadget.ActualHeight / 2;
-                    state.GadgetOrder.Remove(source);
-                    int index = state.GadgetOrder.IndexOf(id) + (after ? 1 : 0);
-                    state.GadgetOrder.Insert(index, source);
+                    if (state.LonghornMode && source == "Clock") state.LonghornBottomClock = false;
+                    ActiveGadgetOrder.Remove(source);
+                    int index = ActiveGadgetOrder.IndexOf(id) + (after ? 1 : 0);
+                    ActiveGadgetOrder.Insert(index, source);
                     ApplyState();
                 }
                 dropCommitted = true; Save();
@@ -84,6 +87,34 @@ public partial class MainWindow
 
         ConfigurePageDrop(PreviousPage, -1);
         ConfigurePageDrop(NextPage, 1);
+        GadgetStack.AllowDrop = true;
+        GadgetStack.DragOver += (_, args) =>
+        {
+            if (!IsGadgetDrag(args.DataView)) return;
+            args.AcceptedOperation = DataPackageOperation.Move;
+        };
+        GadgetStack.Drop += (_, args) =>
+        {
+            if (args.Handled || !IsGadgetDrag(args.DataView) || draggingGadget is not string source) return;
+            args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true;
+            if (state.LonghornMode && source == "Clock") state.LonghornBottomClock = false;
+            ActiveGadgetOrder.Remove(source); ActiveGadgetOrder.Add(source);
+            dropCommitted = true; ApplyState(); Save();
+        };
+        LonghornClockDock.DragOver += (_, args) =>
+        {
+            if (!state.LonghornMode || draggingGadget != "Clock" || !IsGadgetDrag(args.DataView)) return;
+            args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true;
+            LonghornClockDock.Background = SurfaceBrush(Root.RequestedTheme, 90);
+        };
+        LonghornClockDock.DragLeave += (_, _) => LonghornClockDock.Background = null;
+        LonghornClockDock.Drop += (_, args) =>
+        {
+            LonghornClockDock.Background = null;
+            if (!state.LonghornMode || draggingGadget != "Clock" || !IsGadgetDrag(args.DataView)) return;
+            args.AcceptedOperation = DataPackageOperation.Move; args.Handled = true;
+            state.LonghornBottomClock = true; dropCommitted = true; ApplyState(); Save();
+        };
         pageHoverTimer.Tick += (_, _) =>
         {
             pageHoverTimer.Stop();
@@ -92,6 +123,8 @@ public partial class MainWindow
             { state.PageIndex += hoverDirection; ApplyGadgetPage(); }
         };
         Closed += (_, _) => pageHoverTimer.Stop();
+        ApplyGadgetSizes();
+        ApplyCardCustomizations();
     }
 
     private bool IsGadgetDrag(DataPackageView data) => draggingGadget is not null && data.Properties.ContainsKey(GadgetDragKey);

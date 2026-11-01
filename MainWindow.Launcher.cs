@@ -24,10 +24,14 @@ public partial class MainWindow
         state.Shortcuts ??= [];
         void Render(Grid grid)
         {
-        grid.Children.Clear(); grid.RowDefinitions.Clear();
+        grid.Children.Clear(); grid.RowDefinitions.Clear(); grid.ColumnDefinitions.Clear();
+        bool rail = state.LonghornMode && grid == LonghornPins;
+        int columns = Math.Clamp(state.LaunchColumns, 2, 6);
+        for (int column = 0; column < columns; column++) grid.ColumnDefinitions.Add(new ColumnDefinition());
         foreach (var shortcut in state.Shortcuts)
         {
-            int iconSize = state.LonghornMode && grid == LonghornPins ? 20 : 28;
+            int available = Math.Max(12, (SidebarWidth - (rail ? 10 : 48)) / columns - 12);
+            int iconSize = Math.Min(available, rail ? (int)Math.Round(Math.Clamp(state.LaunchIconSize, 16, 40) * 0.65) : Math.Clamp(state.LaunchIconSize, 16, 40));
             var row = new Grid { Width = iconSize, Height = iconSize };
             bool website = IsWebsite(shortcut.Target);
             var fallback = new FontIcon { Glyph = website ? "\uE774" : "\uE8A5", FontSize = 20 };
@@ -39,8 +43,8 @@ public partial class MainWindow
             ToolTipService.SetToolTip(button, shortcut.Name);
             button.Click += async (_, _) => await OpenShortcut(shortcut);
             int index = grid.Children.Count;
-            Grid.SetColumn(button, index % 4); Grid.SetRow(button, index / 4);
-            if (index % 4 == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetColumn(button, index % columns); Grid.SetRow(button, index / columns);
+            if (index % columns == 0) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.Children.Add(button);
             if (!website) LoadShortcutIcon(shortcut, image, fallback);
         }
@@ -48,6 +52,7 @@ public partial class MainWindow
         }
         Render(LaunchItems);
         if (state.LonghornMode) Render(LonghornPins); else { LonghornPins.Children.Clear(); LonghornPins.RowDefinitions.Clear(); }
+        ApplyLonghornSections();
     }
 
     private static bool IsWebsite(string target) => Uri.TryCreate(target, UriKind.Absolute, out var uri) && (uri.Scheme == "http" || uri.Scheme == "https");
@@ -98,7 +103,7 @@ public partial class MainWindow
 
     private async void CustomizeLaunch_Click(object sender, RoutedEventArgs e)
     {
-        if (dialogOpen) { preferencesWindow?.Activate(); return; }
+        if (dialogOpen) { ActivatePreferences(); return; }
         var panel = new StackPanel { Spacing = 12 };
         var appPanel = new StackPanel { Spacing = 10 };
         var webPanel = new StackPanel { Spacing = 10 };

@@ -16,22 +16,25 @@ public partial class MainWindow
     private bool styledHighContrast;
     private int shellGeneration;
     private bool shellShutdownPrepared;
-    private sealed record ShellEntry(string id, string title, string icon, bool active = false);
-    private sealed record ShellSnapshot(ShellEntry[] windows, ShellEntry[] tray, bool ready, bool hidden = false);
+    private sealed record ShellSnapshot(bool ready, bool hidden = false, bool clean = false, bool cleanSupported = true);
     private void InitializeLonghorn()
     {
         if (!state.LonghornMode) ShellBridge.Restore();
-        string[] labels = ["Quick Settings", "Notifications", "Switch input language", "Windows Settings"];
-        string[] glyphs = ["\uE713", "\uE7F4", "\uE8C1", "\uE115"];
+        string[] labels = ["Quick Settings", "Notifications", "Switch input language"];
+        string[] glyphs = ["\uE713", "\uE7F4", "\uE8C1"];
+        LonghornSystemButtons.ColumnDefinitions.Clear();
+        foreach (string label in labels) LonghornSystemButtons.ColumnDefinitions.Add(new ColumnDefinition());
         for (int i = 0; i < labels.Length; i++)
         {
             int action = i;
-            var button = new Button { Content = new FontIcon { Glyph = glyphs[i], FontSize = 14 }, Padding = new Thickness(6), Background = new SolidColorBrush(Colors.Transparent), BorderThickness = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Stretch };
+            IconElement icon = i < 2 ? CreateFluentShellIcon(i == 0 ? "FluentOptions.svg" : "FluentAlert.svg") : new FontIcon { Glyph = glyphs[i], FontSize = 16 };
+            var button = new Button { Content = icon, Padding = new Thickness(6), Background = new SolidColorBrush(Colors.Transparent), BorderThickness = new Thickness(0), HorizontalAlignment = HorizontalAlignment.Stretch };
             ToolTipService.SetToolTip(button, labels[i]); AutomationProperties.SetName(button, labels[i]);
-            button.Click += async (_, _) =>
+            button.Click += (_, _) =>
             {
-                if (action == 3) await Windows.System.Launcher.LaunchUriAsync(new Uri("ms-settings:"));
-                else SendWindowsKey(action == 0 ? (ushort)0x41 : action == 1 ? (ushort)0x4E : (ushort)0x20);
+                if (action == 0) ShowQuickSettings(button);
+                else if (action == 1) ShowNotifications(button);
+                else ShowInputLanguages(button);
             };
             Grid.SetColumn(button, i); LonghornSystemButtons.Children.Add(button);
         }
@@ -39,12 +42,21 @@ public partial class MainWindow
         {
             if (shellShutdownPrepared) return;
             args.Cancel = true; shellShutdownPrepared = true; closing = true; shellGeneration++;
+            currentShellFlyout?.Hide();
             if (shellBridge is { } bridge) { shellBridge = null; await bridge.DisposeAsync(); }
             // Disconnect native callbacks while the WinUI window and dispatcher still exist.
             trayIcon?.Dispose(); appBar?.Dispose(); SystemBackdrop = null;
             DispatcherQueue.TryEnqueue(() => Close());
         };
         _ = UpdateLonghornAsync();
+    }
+    private static PathIcon CreateFluentShellIcon(string asset)
+    {
+        var document = System.Xml.Linq.XDocument.Load(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", asset));
+        string data = document.Descendants().First(element => element.Name.LocalName == "path").Attribute("d")!.Value;
+        var icon = (PathIcon)Microsoft.UI.Xaml.Markup.XamlReader.Load("<PathIcon xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' Width='16' Height='16' Data='" + data + "' Foreground='{ThemeResource TextFillColorPrimaryBrush}'/>");
+        icon.Data.Transform = new ScaleTransform { ScaleX = 2d / 3, ScaleY = 2d / 3 };
+        return icon;
     }
     private async Task UpdateLonghornAsync()
     {
@@ -57,7 +69,7 @@ public partial class MainWindow
             SetTaskbarReplacement(false);
             ApplyLonghornVisuals();
             LonghornPanel.Visibility = state.LonghornMode ? Visibility.Visible : Visibility.Collapsed;
-            ApplyGadgetPage(); RefreshQuickLaunch();
+            ApplyState(); RefreshQuickLaunch();
             if (!state.LonghornMode || closing) return;
             shellBridge = new ShellBridge(json => DispatcherQueue.TryEnqueue(() =>
             {
@@ -67,21 +79,22 @@ public partial class MainWindow
                     var snapshot = JsonSerializer.Deserialize<ShellSnapshot>(json);
                     if (snapshot is null) return;
                     SetTaskbarReplacement(snapshot.hidden && state.LonghornMode);
-                    RenderShellEntries(RunningItems, snapshot.windows, false);
-                    RenderShellEntries(ShellTrayItems, snapshot.tray, true);
-                    if (state.LonghornHideTaskbar && !snapshot.hidden && shellBridge is { } current) _ = current.SendAsync(new { action = "replace", enabled = true });
+                    if (state.LonghornHideSystemTray && !state.LonghornHideTaskbar && !snapshot.cleanSupported)
+                    { PanelStatus.Text = "Windows taskbar tray could not be identified. Its original layout is kept."; PanelStatus.Visibility = Visibility.Visible; }
+                    else if (snapshot.clean && PanelStatus.Text.StartsWith("Windows taskbar tray", StringComparison.Ordinal)) PanelStatus.Visibility = Visibility.Collapsed;
                 }
                 catch (JsonException) { }
             }), () => DispatcherQueue.TryEnqueue(() =>
             {
                 if (generation != shellGeneration || closing) return;
-                SetTaskbarReplacement(false); state.LonghornMode = false; ApplyLonghornVisuals(); LonghornPanel.Visibility = Visibility.Collapsed; ApplyGadgetPage(); Save();
+                SetTaskbarReplacement(false); state.LonghornMode = false; ApplyState(); Save();
                 PanelStatus.Text = "Longhorn services stopped. Windows taskbar restored."; PanelStatus.Visibility = Visibility.Visible;
             }));
+            await UpdateTaskbarOptionsAsync();
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException)
         {
-            SetTaskbarReplacement(false); state.LonghornMode = false; ApplyLonghornVisuals(); LonghornPanel.Visibility = Visibility.Collapsed; ApplyGadgetPage(); Save();
+            SetTaskbarReplacement(false); state.LonghornMode = false; ApplyState(); Save();
             PanelStatus.Text = "Longhorn services could not start. Windows taskbar is available."; PanelStatus.Visibility = Visibility.Visible;
         }
         finally { changingLonghorn = false; }
@@ -95,29 +108,32 @@ public partial class MainWindow
     private Brush RailSurfaceBrush(ElementTheme theme)
     {
         if (!state.LonghornMode || new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast) return SurfaceBrush(theme, 128);
-        return new SolidColorBrush(theme == ElementTheme.Dark ? Windows.UI.Color.FromArgb(184, 24, 37, 46) : Windows.UI.Color.FromArgb(168, 222, 232, 233));
+        return new SolidColorBrush(theme == ElementTheme.Dark ? Windows.UI.Color.FromArgb(124, 12, 24, 29) : Windows.UI.Color.FromArgb(132, 207, 220, 216));
     }
     private void ApplyLonghornVisuals()
     {
         bool contrast = new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
         if (styledLonghorn == state.LonghornMode && styledTheme == Root.RequestedTheme && styledHighContrast == contrast) return;
-        if (!state.LonghornMode) ClearShellEntries();
         styledLonghorn = state.LonghornMode; styledTheme = Root.RequestedTheme; styledHighContrast = contrast;
-        Root.Padding = state.LonghornMode ? new Thickness(4, 4, 4, 4) : new Thickness(10, 8, 10, 10);
-        Root.RowSpacing = state.LonghornMode ? 4 : 8;
-        GadgetStack.Spacing = state.LonghornMode ? 3 : 12;
+        LonghornHeader.Visibility = LonghornBottom.Visibility = LonghornPanel.Visibility = state.LonghornMode ? Visibility.Visible : Visibility.Collapsed;
+        Root.Padding = state.LonghornMode ? new Thickness(5, 3, 5, 4) : new Thickness(10, 8, 10, 10);
+        Root.RowSpacing = state.LonghornMode ? 3 : 8;
+        GadgetStack.Spacing = state.LonghornMode ? 0 : 12;
+        GadgetScroller.Padding = state.LonghornMode ? new Thickness(0) : new Thickness(0, 0, 4, 0);
         MonthText.FontSize = state.LonghornMode ? 13 : 16;
         DateText.FontSize = state.LonghornMode ? 11 : 12;
+        TimeText.FontSize = state.LonghornMode ? 14 : 24;
+        ApplyLonghornSections();
         Root.Background = RailSurfaceBrush(Root.RequestedTheme);
         bool dark = Root.RequestedTheme == ElementTheme.Dark;
         foreach (var tile in new[] { ClockGadget, CalendarGadget, NotesGadget, SystemGadget, TimerCategory, StorageCategory, LaunchCategory, SlideShowGadget, PuzzleGadget, FeedsGadget })
         {
             if (state.LonghornMode && !contrast)
             {
-                tile.CornerRadius = new CornerRadius(0); tile.Padding = new Thickness(6);
-                tile.Background = new SolidColorBrush(dark ? Windows.UI.Color.FromArgb(18, 224, 240, 248) : Windows.UI.Color.FromArgb(76, 255, 255, 255));
-                tile.BorderBrush = new SolidColorBrush(dark ? Windows.UI.Color.FromArgb(30, 224, 240, 248) : Windows.UI.Color.FromArgb(26, 30, 50, 60));
-                tile.BorderThickness = new Thickness(0, 0, 0, 1);
+                tile.CornerRadius = new CornerRadius(0); tile.Padding = new Thickness(4, 8, 4, 8);
+                tile.Background = new SolidColorBrush(Colors.Transparent);
+                tile.BorderBrush = new SolidColorBrush(dark ? Windows.UI.Color.FromArgb(42, 224, 240, 248) : Windows.UI.Color.FromArgb(38, 30, 50, 60));
+                tile.BorderThickness = new Thickness(0, 1, 0, 0);
             }
             else
             {
@@ -128,73 +144,45 @@ public partial class MainWindow
         if (ready) { RenderCalendar(); clockFaceDirty = true; UpdateGadgets(); }
     }
 
-    private void ClearShellEntries()
+    private void ApplyLonghornSections()
     {
-        RunningItems.Children.Clear(); RunningItems.RowDefinitions.Clear();
-        ShellTrayItems.Children.Clear(); ShellTrayItems.RowDefinitions.Clear();
-        shellIconViews.Clear();
-        foreach (string key in shortcutImages.Keys.Where(key => key.StartsWith("shell-icon:", StringComparison.Ordinal)).ToArray()) shortcutImages.Remove(key);
+        LonghornLaunchButtons.Visibility = state.LonghornHideTaskbar ? Visibility.Visible : Visibility.Collapsed;
+        LonghornPinsSection.Visibility = state.LonghornShowPins && (state.Shortcuts?.Count ?? 0) > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    private sealed class ShellIconView
+    private int railSearchGeneration;
+    private async void LonghornSearch_TextChanged(AutoSuggestBox sender, AutoSuggestBoxTextChangedEventArgs args)
     {
-        public required ShellEntry Item;
-        public required Button Button;
-        public required Image Image;
-        public required FontIcon Fallback;
-    }
-    private readonly Dictionary<Grid, Dictionary<string, ShellIconView>> shellIconViews = new();
-    private void RenderShellEntries(Grid grid, ShellEntry[] items, bool tray)
-    {
-        if (!shellIconViews.TryGetValue(grid, out var views)) shellIconViews[grid] = views = new(StringComparer.Ordinal);
-        var keys = items.Select(item => item.id).ToHashSet(StringComparer.Ordinal);
-        foreach (string removed in views.Keys.Where(key => !keys.Contains(key)).ToArray())
-        { grid.Children.Remove(views[removed].Button); views.Remove(removed); }
-        int columns = tray ? 8 : 5;
-        int rows = (items.Length + columns - 1) / columns;
-        while (grid.RowDefinitions.Count > rows) grid.RowDefinitions.RemoveAt(grid.RowDefinitions.Count - 1);
-        while (grid.RowDefinitions.Count < rows) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        for (int index = 0; index < items.Length; index++)
+        if (args.Reason != AutoSuggestionBoxTextChangeReason.UserInput) return;
+        int generation = ++railSearchGeneration;
+        string query = sender.Text.Trim();
+        if (query.Length == 0) { sender.ItemsSource = null; return; }
+        try
         {
-            var item = items[index];
-            bool created = !views.TryGetValue(item.id, out var view);
-            if (created)
-            {
-                var content = new Grid { Width = tray ? 14 : 20, Height = tray ? 14 : 20 };
-                var fallback = new FontIcon { Glyph = tray ? "\uE9CE" : "\uE737", FontSize = 16 }; content.Children.Add(fallback);
-                var image = new Image { Width = tray ? 14 : 20, Height = tray ? 14 : 20, Visibility = Visibility.Collapsed }; content.Children.Add(image);
-                var button = new Button { Content = content, Padding = new Thickness(tray ? 3 : 4), HorizontalAlignment = HorizontalAlignment.Stretch, Background = new SolidColorBrush(Colors.Transparent), BorderBrush = CpuBar.Foreground };
-                view = new ShellIconView { Item = item, Button = button, Image = image, Fallback = fallback }; views.Add(item.id, view);
-                button.Click += async (_, _) => await ShellEntryCommand(view.Item, tray ? "tray" : "window");
-                if (tray) button.RightTapped += async (_, args) => { args.Handled = true; await ShellEntryCommand(view.Item, "trayMenu"); };
-                else
-                {
-                    var menu = new MenuFlyout(); var close = new MenuFlyoutItem { Text = "Close window" };
-                    close.Click += async (_, _) => await ShellEntryCommand(view.Item, "close"); menu.Items.Add(close); button.ContextFlyout = menu;
-                }
-                grid.Children.Add(button);
-            }
-            if (created || view!.Item.title != item.title)
-            { ToolTipService.SetToolTip(view!.Button, item.title); AutomationProperties.SetName(view.Button, string.IsNullOrWhiteSpace(item.title) ? "Tray icon" : item.title); }
-            if (created || view!.Item.active != item.active) view!.Button.BorderThickness = item.active ? new Thickness(0, 0, 0, 2) : new Thickness(0);
-            if ((created || view!.Item.icon != item.icon) && item.icon.Length > 0)
-                LoadShortcutIcon(new LaunchShortcut { Target = "shell-icon:" + item.id + item.icon.GetHashCode(), IconData = item.icon, IconVersion = 2 }, view!.Image, view.Fallback, false);
-            view!.Item = item; view.Button.TabIndex = index;
-            Grid.SetColumn(view.Button, index % columns); Grid.SetRow(view.Button, index / columns);
+            var apps = await InstalledApps.GetAsync();
+            if (generation != railSearchGeneration || closing || !state.LonghornMode) return;
+            sender.ItemsSource = apps.Where(app => app.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).Take(8).ToArray();
         }
-        if (shortcutImages.Count > 256) shortcutImages.Clear();
+        catch (Exception) { if (generation == railSearchGeneration) sender.ItemsSource = null; }
+    }
+    private void LonghornSearch_SuggestionChosen(AutoSuggestBox sender, AutoSuggestBoxSuggestionChosenEventArgs args)
+    { if (args.SelectedItem is InstalledApp app) sender.Text = app.Name; }
+    private async void LonghornSearch_QuerySubmitted(AutoSuggestBox sender, AutoSuggestBoxQuerySubmittedEventArgs args)
+    {
+        if (args.ChosenSuggestion is InstalledApp app)
+            await OpenShortcut(new LaunchShortcut { Name = app.Name, Target = app.Target });
+        else if (!string.IsNullOrWhiteSpace(args.QueryText))
+        {
+            try { await Windows.System.Launcher.LaunchUriAsync(new Uri("search-ms:query=" + Uri.EscapeDataString(args.QueryText.Trim()))); }
+            catch (Exception ex) when (ex is COMException or ArgumentException) { PanelStatus.Text = "Windows Search could not open."; PanelStatus.Visibility = Visibility.Visible; }
+        }
+        sender.IsSuggestionListOpen = false;
     }
 
-    private async Task ShellEntryCommand(ShellEntry entry, string action)
-    {
-        if (shellBridge is null) return;
-        GetCursorPos(out var point);
-        await shellBridge.SendAsync(new { action, id = entry.id, x = point.X, y = point.Y });
-    }
     private void LonghornStart_Click(object sender, RoutedEventArgs e) => SendWindowsKey(0);
     private async void LonghornApps_Click(object sender, RoutedEventArgs e)
     {
-        if (dialogOpen) { preferencesWindow?.Activate(); return; }
+        if (dialogOpen) { ActivatePreferences(); return; }
         var panel = new StackPanel { Spacing = 12 };
         var search = new TextBox { PlaceholderText = "Search installed apps" }; panel.Children.Add(search);
         var list = new GridView { Height = 380, SelectionMode = ListViewSelectionMode.None, IsItemClickEnabled = true };
@@ -238,8 +226,11 @@ public partial class MainWindow
     }
     private async void RestoreTaskbar_Click(object sender, RoutedEventArgs e)
     {
-        state.LonghornMode = false; state.LonghornHideTaskbar = false; Save(); await UpdateLonghornAsync(); ShellBridge.Restore();
+        state.LonghornHideTaskbar = false; ApplyLonghornSections(); Save();
+        if (shellBridge is not null) await UpdateTaskbarOptionsAsync();
+        else { ShellBridge.Restore(); SetTaskbarReplacement(false); }
     }
+    private Task UpdateTaskbarOptionsAsync() => shellBridge?.SendAsync(new { action = "replace", enabled = state.LonghornHideTaskbar, clean = state.LonghornHideSystemTray }) ?? Task.CompletedTask;
     [StructLayout(LayoutKind.Explicit, Size = 40)] private struct ShellKeyInput { [FieldOffset(0)] public uint Type; [FieldOffset(8)] public ushort Key; [FieldOffset(12)] public uint Flags; }
     private void SendWindowsKey(ushort key)
     {
