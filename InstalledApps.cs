@@ -7,7 +7,9 @@ public sealed class InstalledApp
 {
     public string Name { get; set; }
     public string Target { get; set; }
+    public string? IconTarget { get; set; }
     public InstalledApp(string name, string target) { Name = name; Target = target; }
+    public override string ToString() => Name;
 }
 
 internal static class InstalledApps

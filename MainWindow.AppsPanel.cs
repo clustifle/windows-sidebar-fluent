@@ -18,6 +18,6 @@ public partial class MainWindow
         ToolTipService.SetToolTip(root, app.Name);
         icon.Source = null; icon.Visibility = Visibility.Collapsed; fallback.Visibility = Visibility.Visible; fallback.Glyph = "\uE8A5"; root.IsHitTestVisible = !string.IsNullOrEmpty(app.Target);
         if (string.IsNullOrEmpty(app.Target)) { fallback.Glyph = "\uE721"; return; }
-        LoadShortcutIcon(new LaunchShortcut { Name = app.Name, Target = app.Target }, icon, fallback, false);
+        LoadShortcutIcon(new LaunchShortcut { Name = app.Name, Target = app.IconTarget ?? app.Target }, icon, fallback, false);
     }
 }

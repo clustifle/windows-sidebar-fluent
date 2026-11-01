@@ -46,7 +46,8 @@ public partial class MainWindow
         bool contrast = new Windows.UI.ViewManagement.AccessibilitySettings().HighContrast;
         if (styledLonghorn == state.LonghornMode && styledTheme == Root.RequestedTheme && styledHighContrast == contrast) return;
         styledLonghorn = state.LonghornMode; styledTheme = Root.RequestedTheme; styledHighContrast = contrast;
-        LonghornHeader.Visibility = LonghornBottom.Visibility = LonghornPanel.Visibility = state.LonghornMode ? Visibility.Visible : Visibility.Collapsed;
+        LonghornBottom.Visibility = LonghornPanel.Visibility = state.LonghornMode ? Visibility.Visible : Visibility.Collapsed;
+        ApplyLauncherEntry();
         Root.Padding = state.LonghornMode ? new Thickness(5, 3, 5, 4) : new Thickness(10, 8, 10, 10);
         Root.RowSpacing = state.LonghornMode ? 3 : 8;
         GadgetStack.Spacing = state.LonghornMode ? 0 : 12;
@@ -90,7 +91,7 @@ public partial class MainWindow
         try
         {
             var apps = await InstalledApps.GetAsync();
-            if (generation != railSearchGeneration || closing || !state.LonghornMode) return;
+            if (generation != railSearchGeneration || closing || !(state.LonghornMode || state.OperatingMode == "Launcher")) return;
             var matches = apps.Where(app => app.Name.Contains(query, StringComparison.CurrentCultureIgnoreCase)).OrderByDescending(app => app.Name.StartsWith(query, StringComparison.CurrentCultureIgnoreCase)).Take(8).ToArray(); sender.ItemsSource = matches.Length == 0 ? new[] { new InstalledApp("No matching apps", "") } : matches;
             SidebarAppSearchBox.Configure(sender, state.Left);
         }

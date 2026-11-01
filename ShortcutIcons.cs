@@ -6,7 +6,14 @@ namespace Sidebar;
 
 internal static class ShortcutIcons
 {
+    private static readonly SemaphoreSlim DecodeSlots = new(2);
     public static async Task<string> GetEmbeddedAsync(string target)
+    {
+        await DecodeSlots.WaitAsync();
+        try { return await GetEmbeddedCoreAsync(target); }
+        finally { DecodeSlots.Release(); }
+    }
+    private static async Task<string> GetEmbeddedCoreAsync(string target)
     {
         string bitmapData = await GetBitmapAsync(target);
         if (string.IsNullOrEmpty(bitmapData)) return "";

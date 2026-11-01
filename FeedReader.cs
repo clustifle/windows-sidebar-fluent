@@ -1,10 +1,11 @@
 using System.Net;
 using System.Xml;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
 namespace Sidebar;
 
-internal sealed record FeedHeadline(string Title, Uri Link);
+internal sealed record FeedHeadline(string Title, Uri Link, Uri? Thumbnail = null);
 internal static class FeedReader
 {
     private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(15) };
@@ -36,9 +37,56 @@ internal static class FeedReader
             string title = WebUtility.HtmlDecode(entry.Elements().FirstOrDefault(e => e.Name.LocalName == "title")?.Value ?? "").Trim();
             var linkNode = entry.Elements().FirstOrDefault(e => e.Name.LocalName == "link" && (e.Attribute("rel") is null || e.Attribute("rel")?.Value == "alternate"));
             string link = linkNode?.Attribute("href")?.Value ?? linkNode?.Value ?? "";
-            if (title.Length > 0 && !string.IsNullOrWhiteSpace(link) && Uri.TryCreate(baseUri, link.Trim(), out var uri) && uri.Scheme is "http" or "https") headlines.Add(new(title, uri));
+            var uri = WebUri(link, ElementBase(linkNode ?? entry, baseUri));
+            if (title.Length > 0 && uri is not null) headlines.Add(new(title, uri, FindThumbnail(entry, baseUri, uri)));
             if (headlines.Count == Math.Clamp(count, 1, 10)) break;
         }
         return headlines;
+    }
+
+    internal static Uri? WebUri(string? value, Uri basis)
+        => !string.IsNullOrWhiteSpace(value) && value.Length <= 4096 && Uri.TryCreate(basis, WebUtility.HtmlDecode(value.Trim()), out var uri)
+            && uri.Scheme is "http" or "https" && string.IsNullOrEmpty(uri.UserInfo) ? uri : null;
+
+    private static Uri ElementBase(XElement element, Uri basis)
+    {
+        foreach (var ancestor in element.AncestorsAndSelf().Reverse())
+            if (ancestor.Attribute(XNamespace.Xml + "base") is { } attribute && WebUri(attribute.Value, basis) is { } resolved) basis = resolved;
+        return basis;
+    }
+
+    private static bool VisibleImage(XElement element)
+        => !(int.TryParse(element.Attribute("width")?.Value, out int width) && width <= 1)
+            && !(int.TryParse(element.Attribute("height")?.Value, out int height) && height <= 1);
+
+    private static Uri? FindThumbnail(XElement entry, Uri basis, Uri article)
+    {
+        bool Media(XElement e) => e.Name.NamespaceName.TrimEnd('/') == "http://search.yahoo.com/mrss";
+        bool ImageType(XElement e) => e.Attribute("type")?.Value.StartsWith("image/", StringComparison.OrdinalIgnoreCase) == true;
+        var candidates = entry.Descendants().Where(e => Media(e) && e.Name.LocalName == "thumbnail")
+            .Concat(entry.Descendants().Where(e => Media(e) && e.Name.LocalName == "content" && (ImageType(e) || e.Attribute("medium")?.Value == "image")))
+            .Concat(entry.Elements().Where(e => e.Name.LocalName == "enclosure" && ImageType(e) || e.Name.LocalName == "link" && e.Attribute("rel")?.Value == "enclosure" && ImageType(e)));
+        foreach (var element in candidates)
+            if (VisibleImage(element) && WebUri(element.Attribute("url")?.Value ?? element.Attribute("href")?.Value, ElementBase(element, basis)) is { } image) return image;
+        foreach (var element in entry.Elements().Where(e => e.Name.LocalName is "description" or "encoded" or "content" or "summary"))
+        {
+            foreach (var image in element.Descendants().Where(e => e.Name.LocalName == "img" && VisibleImage(e)))
+                if (WebUri(image.Attribute("src")?.Value ?? image.Attribute("data-src")?.Value, ElementBase(image, basis)) is { } nested) return nested;
+            try
+            {
+                // Read only image attributes; feed HTML is never rendered or executed.
+                foreach (Match tag in Regex.Matches(element.Value, "<img\\b[^>]{0,8192}>", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(50)))
+                {
+                    var attrs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (Match attr in Regex.Matches(tag.Value, "(?<name>[\\w-]+)\\s*=\\s*(?:\"(?<value>[^\"]*)\"|'(?<value>[^']*)'|(?<value>[^\\s>]+))", RegexOptions.None, TimeSpan.FromMilliseconds(50)))
+                        attrs[attr.Groups["name"].Value] = attr.Groups["value"].Value;
+                    if (attrs.TryGetValue("width", out var w) && int.TryParse(w, out int width) && width <= 1 || attrs.TryGetValue("height", out var h) && int.TryParse(h, out int height) && height <= 1) continue;
+                    var imageBase = element.AncestorsAndSelf().Any(e => e.Attribute(XNamespace.Xml + "base") is not null) ? ElementBase(element, basis) : article;
+                    if (WebUri(attrs.GetValueOrDefault("src") ?? attrs.GetValueOrDefault("data-src"), imageBase) is { } image) return image;
+                }
+            }
+            catch (RegexMatchTimeoutException) { }
+        }
+        return null;
     }
 }

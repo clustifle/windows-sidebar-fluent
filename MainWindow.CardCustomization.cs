@@ -40,10 +40,11 @@ public partial class MainWindow
             if (gadgetHeadings.TryGetValue(id, out var heading))
             { heading.Text = string.IsNullOrWhiteSpace(style.Title) ? originalHeadings[id] : style.Title; heading.Visibility = style.ShowTitle ? Visibility.Visible : Visibility.Collapsed; }
         }
+        ApplyV2Appearance();
         NotesBox.FontSize = Math.Clamp(state.NotesFontSize, 10, 24);
         SlideImage.Stretch = state.SlideFit == "Fit" ? Stretch.Uniform : state.SlideFit == "Stretch" ? Stretch.Fill : Stretch.UniformToFill;
         SlideName.Visibility = state.SlideShowName ? Visibility.Visible : Visibility.Collapsed;
-        PuzzleStatus.Visibility = state.PuzzleShowMoves ? Visibility.Visible : Visibility.Collapsed;
+        PuzzleStatus.Visibility = state.PuzzleShowMoves || picturePuzzle.Solved || puzzleImageError is not null ? Visibility.Visible : Visibility.Collapsed;
         CalendarTodayButton.Visibility = state.CalendarTodayButton ? Visibility.Visible : Visibility.Collapsed;
     }
     private void RegisterGadgetHeading(string id, UIElement content)
@@ -106,10 +107,16 @@ public partial class MainWindow
                 ActionButton("Choose picture folder…", () => ChooseSlideFolder_Click(this, new RoutedEventArgs())); break;
             case "Picture puzzle":
                 AddToggle(panel, "Show move count", state.PuzzleShowMoves, value => state.PuzzleShowMoves = value);
+                AddToggle(panel, "Show numbers on picture tiles", state.PuzzleNumberLabels, value => { state.PuzzleNumberLabels = value; RenderPuzzle(); });
+                Choice("Nature sample", PuzzleSamples.All.Select(sample => sample.Name).ToArray(), PuzzleSamples.Find(state.PuzzleSampleId).Name, name => SelectPuzzleSample(PuzzleSamples.All.First(sample => sample.Name == name).Id));
+                AddToggle(panel, "Change sample when shuffling", state.PuzzleRotateSamples, value => state.PuzzleRotateSamples = value);
+                ActionButton("Use sample picture", () => SetPuzzleImageMode("Sample"));
                 ActionButton("Choose picture…", () => ChoosePuzzlePicture_Click(this, new RoutedEventArgs()));
-                ActionButton("Use numbered tiles", () => { state.PuzzlePicture = ""; puzzlePicture = null; RenderPuzzle(); Save(); });
+                ActionButton("Use numbered tiles", () => SetPuzzleImageMode("Numbers"));
+                ActionButton("Preview completed picture", () => PreviewPuzzle_Click(PuzzlePreview, new RoutedEventArgs()));
                 ActionButton("Shuffle", () => PuzzleShuffle_Click(this, new RoutedEventArgs())); break;
             case "Feed headlines":
+                AddToggle(panel, "Show article thumbnails", state.FeedShowThumbnails, value => { state.FeedShowThumbnails = value; RenderFeedHeadlines(displayedHeadlines); });
                 Number("Headlines", state.FeedCount, 1, 10, value => state.FeedCount = value);
                 Number("Refresh interval (minutes)", state.FeedRefreshMinutes, 5, 120, value => state.FeedRefreshMinutes = value);
                 ActionButton("Feed address…", () => OpenGadgetOptions(() => ConfigureFeed_Click(this, new RoutedEventArgs()))); break;

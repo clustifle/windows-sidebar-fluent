@@ -1,0 +1,112 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Fragment>
+    <WixVariable Id="WixUIDialogBmp" Value="$(var.SetupAssets)\Dialog.bmp" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(var.SetupAssets)\Banner.bmp" />
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <Property Id="WixUI_InstallMode" Value="Install" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch FluentSidebar" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALTEXT" Value="Your desktop gadgets are ready. Right-click the sidebar to customize them." />
+    <Property Id="INSTALLDESKTOPSHORTCUT" Secure="yes" />
+    <Property Id="DESKTOPCHECKBOX" Value="1" />
+    <Property Id="EXISTINGDESKTOPCHOICE">
+      <RegistrySearch Id="FindDesktopChoice" Root="HKCU" Key="Software\Clustifle\Windows Sidebar Fluent\Installer" Name="DesktopChoice" Type="raw" />
+    </Property>
+    <Property Id="INSTALLSTARTUP" Secure="yes" />
+    <Property Id="USEROPTIONSSET" Secure="yes" />
+    <Property Id="EXISTINGSTARTUP">
+      <RegistrySearch Id="FindExistingStartup" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="FluentSidebar" Type="raw" />
+    </Property>
+    <Property Id="EXISTINGLEGACYSTARTUP">
+      <RegistrySearch Id="FindLegacyStartup" Root="HKCU" Key="Software\Microsoft\Windows\CurrentVersion\Run" Name="ClassicFluentSidebar" Type="raw" />
+    </Property>
+    <Property Id="INSTALLFOLDER" Secure="yes">
+      <RegistrySearch Id="FindExistingInstallFolder" Root="HKCU" Key="Software\Clustifle\Windows Sidebar Fluent\Installer" Name="InstallFolder" Type="raw" />
+    </Property>
+    <SetProperty Id="INSTALLSTARTUP" Value="1" Action="InitializeStartupChoice" Before="CostFinalize" Sequence="both" Condition="(EXISTINGSTARTUP OR EXISTINGLEGACYSTARTUP) AND NOT INSTALLSTARTUP AND NOT USEROPTIONSSET" />
+    <SetProperty Id="INSTALLDESKTOPSHORTCUT" Value="1" Action="InitializeDesktopDefault" Before="CostFinalize" Sequence="both" Condition="NOT INSTALLDESKTOPSHORTCUT AND EXISTINGDESKTOPCHOICE &lt;&gt; &quot;#0&quot;" />
+    <SetProperty Id="INSTALLDESKTOPSHORTCUT" Value="0" Action="InitializeDesktopOff" Before="CostFinalize" Sequence="both" Condition="NOT INSTALLDESKTOPSHORTCUT AND EXISTINGDESKTOPCHOICE = &quot;#0&quot;" />
+    <CustomAction Id="LaunchFluentSidebar" FileRef="$(var.AppExeFileId)" ExeCommand="" Return="asyncNoWait" Impersonate="yes" />
+    <UI Id="FluentSetup">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Segoe UI" Size="9" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Segoe UI" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Segoe UI" Size="10" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="InstallDirDlg" />
+      <DialogRef Id="BrowseDlg" />
+      <DialogRef Id="DiskCostDlg" />
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="ExitDialog" />
+      <DialogRef Id="MaintenanceWelcomeDlg" />
+      <DialogRef Id="MaintenanceTypeDlg" />
+      <DialogRef Id="VerifyReadyDlg" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Property="DESKTOPCHECKBOX" Value="{}" Order="1" Condition="NOT OPTIONSINITIALIZED AND INSTALLDESKTOPSHORTCUT = &quot;0&quot;" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Property="STARTUPCHECKBOX" Value="1" Order="2" Condition="NOT OPTIONSINITIALIZED AND INSTALLSTARTUP = &quot;1&quot;" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Property="OPTIONSINITIALIZED" Value="1" Order="3" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="InstallDirDlg" Order="4" />
+      <Publish Dialog="InstallDirDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="CheckTargetPath" Value="INSTALLFOLDER" Order="1" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="SetTargetPath" Value="INSTALLFOLDER" Order="2" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="FluentOptionsDlg" Order="3" />
+      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Property="_BrowseProperty" Value="INSTALLFOLDER" Order="1" />
+      <Publish Dialog="InstallDirDlg" Control="ChangeFolder" Event="SpawnDialog" Value="BrowseDlg" Order="2" />
+      <Publish Dialog="BrowseDlg" Control="OK" Event="CheckTargetPath" Value="[_BrowseProperty]" Order="1" />
+      <Publish Dialog="BrowseDlg" Control="OK" Event="SetTargetPath" Value="[_BrowseProperty]" Order="2" />
+      <Publish Dialog="BrowseDlg" Control="OK" Event="EndDialog" Value="Return" Order="3" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchFluentSidebar" Order="1" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = &quot;1&quot; AND NOT Installed AND NOT REMOVE" />
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Dialog Id="FluentOptionsDlg" Width="370" Height="270" Title="FluentSidebar Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" Text="WixUI_Bmp_Banner" />
+        <Control Id="Heading" Type="Text" X="15" Y="6" Width="290" Height="18" Transparent="yes" Text="{\WixUI_Font_Title}Make it yours" />
+        <Control Id="Subtitle" Type="Text" X="15" Y="25" Width="300" Height="16" Transparent="yes" Text="Choose how FluentSidebar fits into your desktop." />
+        <Control Id="Desktop" Type="CheckBox" X="22" Y="69" Width="320" Height="20" Property="DESKTOPCHECKBOX" CheckBoxValue="1" Text="Create a desktop shortcut" />
+        <Control Id="Startup" Type="CheckBox" X="22" Y="102" Width="320" Height="20" Property="STARTUPCHECKBOX" CheckBoxValue="1" Text="Start FluentSidebar when I sign in to Windows" />
+        <Control Id="Hint" Type="Text" X="22" Y="140" Width="320" Height="45" Text="A Start menu shortcut is included. You can change startup behavior later in Sidebar Settings." />
+        <Control Id="Privacy" Type="Text" X="22" Y="194" Width="320" Height="30" Text="Notes and preferences stay on this PC and are kept during upgrades and uninstall." />
+        <Control Id="Line" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back"><Publish Event="NewDialog" Value="InstallDirDlg" /></Control>
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Next">
+          <Publish Property="INSTALLDESKTOPSHORTCUT" Value="1" Order="1" Condition="DESKTOPCHECKBOX = &quot;1&quot;" />
+          <Publish Property="INSTALLDESKTOPSHORTCUT" Value="0" Order="2" Condition="NOT DESKTOPCHECKBOX" />
+          <Publish Property="INSTALLSTARTUP" Value="1" Order="3" Condition="STARTUPCHECKBOX = &quot;1&quot;" />
+          <Publish Property="INSTALLSTARTUP" Value="0" Order="4" Condition="NOT STARTUPCHECKBOX" />
+          <Publish Property="DESKTOPSUMMARY" Value="Yes" Order="5" Condition="DESKTOPCHECKBOX = &quot;1&quot;" />
+          <Publish Property="DESKTOPSUMMARY" Value="No" Order="6" Condition="NOT DESKTOPCHECKBOX" />
+          <Publish Property="STARTUPSUMMARY" Value="Yes" Order="7" Condition="STARTUPCHECKBOX = &quot;1&quot;" />
+          <Publish Property="STARTUPSUMMARY" Value="No" Order="8" Condition="NOT STARTUPCHECKBOX" />
+          <Publish Property="USEROPTIONSSET" Value="1" Order="9" />
+          <Publish Event="NewDialog" Value="FluentReadyDlg" Order="10" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel"><Publish Event="SpawnDialog" Value="CancelDlg" /></Control>
+      </Dialog>
+      <Dialog Id="FluentReadyDlg" Width="370" Height="270" Title="FluentSidebar Setup">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" Text="WixUI_Bmp_Banner" />
+        <Control Id="Heading" Type="Text" X="15" Y="6" Width="290" Height="18" Transparent="yes" Text="{\WixUI_Font_Title}Ready to install" />
+        <Control Id="Subtitle" Type="Text" X="15" Y="25" Width="300" Height="16" Transparent="yes" Text="Review your choices, then select Install." />
+        <Control Id="FolderLabel" Type="Text" X="22" Y="62" Width="320" Height="18" Text="Installation folder" />
+        <Control Id="FolderValue" Type="Text" X="22" Y="83" Width="320" Height="40" NoPrefix="yes" Text="[INSTALLFOLDER]" />
+        <Control Id="DesktopSummary" Type="Text" X="22" Y="133" Width="320" Height="20" Text="Desktop shortcut: [DESKTOPSUMMARY]" />
+        <Control Id="StartupSummary" Type="Text" X="22" Y="162" Width="320" Height="20" Text="Start at sign-in: [STARTUPSUMMARY]" />
+        <Control Id="Scope" Type="Text" X="22" Y="199" Width="320" Height="22" Text="Installs for your Windows account." />
+        <Control Id="Line" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="&amp;Back"><Publish Event="NewDialog" Value="FluentOptionsDlg" /></Control>
+        <Control Id="Install" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="&amp;Install"><Publish Event="EndDialog" Value="Return" /></Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="Cancel"><Publish Event="SpawnDialog" Value="CancelDlg" /></Control>
+      </Dialog>
+    </UI>
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
+</Wix>

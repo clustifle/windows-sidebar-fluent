@@ -18,6 +18,11 @@ public partial class MainWindow
             input.ValueChanged += (_, args) => { if (!double.IsFinite(args.NewValue)) return; int next = Math.Clamp((int)args.NewValue, minimum, maximum); if (next == applied) return; applied = next; change(next); ApplyState(); UpdateClassicGadgets(); Save(); }; panel.Children.Add(input);
         }
         var appearance = Section("Appearance");
+        ToggleSwitch? longhornModeSwitch = null;
+        var preset = new ComboBox { Header = "Appearance preset", ItemsSource = new[] { "Fluent", "Vista", "Longhorn 4074" }, SelectedItem = state.AppearancePreset, HorizontalAlignment = HorizontalAlignment.Stretch };
+        preset.SelectionChanged += async (_, _) => { if (preset.SelectedItem is not string selected || selected == state.AppearancePreset) return; state.AppearancePreset = selected; state.LonghornMode = selected == "Longhorn 4074"; if (longhornModeSwitch is not null) longhornModeSwitch.IsOn = state.LonghornMode; styledLonghorn = null; await UpdateLonghornAsync(); Save(); }; appearance.Children.Add(preset);
+        var mode = new ComboBox { Header = "Operating mode", ItemsSource = new[] { "Desktop Sidebar", "Launcher" }, SelectedItem = state.OperatingMode, HorizontalAlignment = HorizontalAlignment.Stretch };
+        mode.SelectionChanged += (_, _) => { if (mode.SelectedItem is string selected && selected != state.OperatingMode) { state.OperatingMode = selected; ApplyLauncherEntry(); Save(); } }; appearance.Children.Add(mode);
         var theme = new ComboBox { Header = "Theme", ItemsSource = new[] { "System", "Light", "Dark" }, SelectedItem = state.Theme, HorizontalAlignment = HorizontalAlignment.Stretch };
         theme.SelectionChanged += (_, _) => { if (theme.SelectedItem is not string selected || state.Theme == selected) return; state.Theme = selected; SynchronizeAppearance(); QueueAppearanceRefresh(); Save(); }; appearance.Children.Add(theme);
         var material = new ComboBox { Header = "Material", ItemsSource = new[] { "Acrylic", "Mica" }, SelectedItem = state.Material, HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -35,7 +40,8 @@ public partial class MainWindow
         }
         var longhornPanel = Section("Longhorn");
         var longhorn = new ToggleSwitch { Header = "Longhorn mode", IsOn = state.LonghornMode };
-        longhorn.Toggled += async (_, _) => { if (longhorn.IsOn == state.LonghornMode) return; longhorn.IsEnabled = false; try { state.LonghornMode = longhorn.IsOn; await UpdateLonghornAsync(); Save(); } finally { longhorn.IsEnabled = true; } }; longhornPanel.Children.Add(longhorn);
+        longhornModeSwitch = longhorn;
+        longhorn.Toggled += async (_, _) => { if (longhorn.IsOn == state.LonghornMode) return; longhorn.IsEnabled = false; try { state.LonghornMode = longhorn.IsOn; state.AppearancePreset = longhorn.IsOn ? "Longhorn 4074" : "Fluent"; preset.SelectedItem = state.AppearancePreset; styledLonghorn = null; await UpdateLonghornAsync(); Save(); } finally { longhorn.IsEnabled = true; } }; longhornPanel.Children.Add(longhorn);
         Number(longhornPanel, "Rail width", 156, 280, state.LonghornWidth, value => state.LonghornWidth = value);
         AddToggle(longhornPanel, "Dock clock at the bottom", state.LonghornBottomClock, value => state.LonghornBottomClock = value);
         AddToggle(longhornPanel, "Show pinned launchers", state.LonghornShowPins, value => { state.LonghornShowPins = value; ApplyLonghornSections(); });
@@ -47,7 +53,7 @@ public partial class MainWindow
         side.Toggled += async (_, _) => { if (side.IsOn != state.Left) await MoveSidebarAsync(side.IsOn); }; behavior.Children.Add(side);
         AddToggle(behavior, "Keep above other windows", state.AlwaysOnTop, value => state.AlwaysOnTop = value);
         AddToggle(behavior, "Start with Windows", StartupPreference.Enabled, SetStartup);
-        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 1.3.1 preview. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 2.0.0. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         return tabs;
     }
     private void ActivatePreferences()

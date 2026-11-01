@@ -11,6 +11,7 @@ internal sealed class DesktopAppBar : IDisposable
     private readonly IntPtr hwnd;
     private readonly SubclassProc subclass;
     private readonly Action<Action> enqueue;
+    private readonly Action desktopVisibilityChanged;
     private readonly uint callbackMessage = RegisterWindowMessage("ClassicSidebar.AppBar.Notification");
     private readonly uint taskbarCreated = RegisterWindowMessage("TaskbarCreated");
     private bool registered, disposed, positioning, positionQueued;
@@ -22,10 +23,11 @@ internal sealed class DesktopAppBar : IDisposable
     private double revealProgress = 1;
     private IntPtr explorerTaskbar;
 
-    public DesktopAppBar(IntPtr hwnd, Action<Action> enqueue)
+    public DesktopAppBar(IntPtr hwnd, Action<Action> enqueue, Action desktopVisibilityChanged)
     {
         this.hwnd = hwnd;
         this.enqueue = enqueue;
+        this.desktopVisibilityChanged = desktopVisibilityChanged;
         subclass = WindowProcedure;
         if (!SetWindowSubclass(hwnd, subclass, 1, UIntPtr.Zero))
             throw new Win32Exception(Marshal.GetLastWin32Error(), "Cannot attach sidebar shell notifications.");
@@ -57,6 +59,14 @@ internal sealed class DesktopAppBar : IDisposable
         revealProgress = autoHide ? Math.Clamp(progress, 0, 1) : 1;
         revealed = revealProgress > 0;
         Position();
+    }
+
+    public void RestoreOnDesktop()
+    {
+        if (disposed) return;
+        fullscreen = false;
+        if (!IsWindowVisible(hwnd) || IsIconic(hwnd)) ShowWindow(hwnd, 4); // Restore without activating.
+        Position(); UpdateZOrder();
     }
 
     private AppBarData Data() => new() { Size = (uint)Marshal.SizeOf<AppBarData>(), Window = hwnd, CallbackMessage = callbackMessage };
@@ -141,7 +151,11 @@ internal sealed class DesktopAppBar : IDisposable
                 if (message == callbackMessage)
                 {
                     if (wParam.ToUInt64() == 1) QueuePosition(); // ABN_POSCHANGED
-                    else if (wParam.ToUInt64() == 2) { fullscreen = lParam != IntPtr.Zero; UpdateZOrder(); }
+                    else if (wParam.ToUInt64() == 2)
+                    {
+                        fullscreen = lParam != IntPtr.Zero && !IsDesktopForeground();
+                        UpdateZOrder(); desktopVisibilityChanged();
+                    }
                 }
                 else if (message == taskbarCreated)
                 {
@@ -157,6 +171,8 @@ internal sealed class DesktopAppBar : IDisposable
                     QueuePosition();
                 }
                 else if (message is 0x001A or 0x007E or 0x02E0) QueuePosition(); // work-area/taskbar edge, display, or DPI change
+                else if ((message == 0x0018 && wParam == UIntPtr.Zero) || (message == 0x0005 && wParam.ToUInt64() == 1))
+                    desktopVisibilityChanged(); // Shell hiding/minimizing the rail, including Show Desktop.
                 else if (message == 0x0006 && registered)
                 {
                     var notification = Data();
@@ -202,6 +218,18 @@ internal sealed class DesktopAppBar : IDisposable
         }
         return IntPtr.Zero;
     }
+    private static bool IsDesktopForeground()
+    {
+        var window = GetForegroundWindow();
+        if (window == IntPtr.Zero) return false;
+        var name = new System.Text.StringBuilder(128); GetClassName(window, name, name.Capacity);
+        return window == GetShellWindow() || name.ToString() is "Progman" or "WorkerW";
+    }
+    [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, System.Text.StringBuilder name, int capacity);
+    [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool IsIconic(IntPtr window);
+    [DllImport("user32.dll")] private static extern bool ShowWindow(IntPtr window, int command);
     [DllImport("user32.dll")] private static extern IntPtr GetShellWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint process);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string name, string? title);

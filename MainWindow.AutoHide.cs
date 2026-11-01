@@ -14,6 +14,7 @@ public partial class MainWindow
     private bool requestedLeft;
     private bool desktopActive;
     private IntPtr foregroundHook;
+    private readonly DispatcherTimer desktopRecoveryTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
     private WinEventCallback? foregroundCallback;
     private readonly DispatcherTimer revealTimer = new() { Interval = TimeSpan.FromMilliseconds(16) };
     private readonly System.Diagnostics.Stopwatch revealClock = new();
@@ -30,13 +31,14 @@ public partial class MainWindow
         hideTimer.Tick += (_, _) =>
         {
             hideTimer.Stop();
-            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && !LonghornSearch.IsSuggestionListOpen && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
+            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && !LonghornSearch.IsSuggestionListOpen && puzzlePopup?.IsOpen != true && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
         };
         revealTimer.Tick += (_, _) => AdvanceReveal();
-        foregroundCallback = (_, _, _, _, _, _, _) => DispatcherQueue.TryEnqueue(UpdateDesktopVisibility);
+        desktopRecoveryTimer.Tick += (_, _) => { desktopRecoveryTimer.Stop(); UpdateDesktopVisibility(); };
+        foregroundCallback = (_, _, _, _, _, _, _) => DispatcherQueue.TryEnqueue(QueueDesktopVisibilityCheck);
         foregroundHook = SetWinEventHook(3, 3, IntPtr.Zero, foregroundCallback, 0, 0, 0);
         UpdateDesktopVisibility();
-        Closed += (_, _) => { sidebarClosed = true; revealGeneration++; hideTimer.Stop(); revealTimer.Stop(); if (foregroundHook != IntPtr.Zero) UnhookWinEvent(foregroundHook); };
+        Closed += (_, _) => { sidebarClosed = true; revealGeneration++; hideTimer.Stop(); revealTimer.Stop(); desktopRecoveryTimer.Stop(); if (foregroundHook != IntPtr.Zero) UnhookWinEvent(foregroundHook); };
     }
 
     private void ApplyAutoHidePreference()
@@ -49,7 +51,7 @@ public partial class MainWindow
 
     private void QueueAutoHide()
     {
-        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || LonghornSearch.IsSuggestionListOpen || draggingGadget is not null) return;
+        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || LonghornSearch.IsSuggestionListOpen || puzzlePopup?.IsOpen == true || draggingGadget is not null) return;
         hideTimer.Stop(); hideTimer.Start();
     }
 
@@ -98,6 +100,14 @@ public partial class MainWindow
         visual.Opacity = currentReveal <= 0.001 ? 0 : 1;
     }
 
+    private void QueueDesktopVisibilityCheck()
+    {
+        if (sidebarClosed || closing) return;
+        UpdateDesktopVisibility();
+        // Explorer may finish hiding/stacking windows after the foreground event.
+        desktopRecoveryTimer.Stop(); desktopRecoveryTimer.Start();
+    }
+
     private void UpdateDesktopVisibility()
     {
         if (sidebarClosed) return;
@@ -109,13 +119,14 @@ public partial class MainWindow
         string windowClass = name.ToString();
         if (windowClass is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd") return;
         desktopActive = windowClass is "Progman" or "WorkerW" || foreground == GetShellWindow();
-        if (desktopActive) RevealSidebar(); else QueueAutoHide();
+        if (desktopActive) { appBar?.RestoreOnDesktop(); RevealSidebar(); } else QueueAutoHide();
     }
 
     private async Task MoveSidebarAsync(bool left)
     {
         requestedLeft = left;
         LonghornSearch.IsSuggestionListOpen = false;
+        puzzlePopup?.Hide();
         if (sideMoveRunning || sidebarClosed) return;
         sideMoveRunning = true;
         hideTimer.Stop(); revealTimer.Stop(); currentReveal = revealFrom = revealTo = 1; revealGeneration++;

@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         try { if (System.IO.File.Exists(statePath)) state = JsonSerializer.Deserialize<SidebarState>(System.IO.File.ReadAllText(statePath)) ?? new(); }
         catch (Exception ex) when (ex is System.IO.IOException or JsonException or UnauthorizedAccessException) { SaveStatus.Text = "Could not read saved settings"; }
+        NormalizeV2Preferences();
         NotesBox.Text = state.Notes;
         ApplyState();
         InitializeGadgetDragging();
@@ -77,7 +78,9 @@ public partial class MainWindow : Window
         HideFromTaskSwitchers();
         SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0004 | 0x0010 | 0x0020);
         SynchronizeAppearance();
-        appBar = new DesktopAppBar(hwnd, action => DispatcherQueue.TryEnqueue(() => action()));
+        appBar = new DesktopAppBar(hwnd, action => DispatcherQueue.TryEnqueue(() => action()), () => DispatcherQueue.TryEnqueue(QueueDesktopVisibilityCheck));
+        uint excludeFromPeek = 1;
+        DwmSetWindowAttribute(hwnd, 12, ref excludeFromPeek, sizeof(uint));
         string iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Sidebar.ico");
         AppWindow.SetIcon(iconPath);
         trayIcon = new TrayIcon(hwnd, iconPath, command => DispatcherQueue.TryEnqueue(() => HandleTrayCommand(command)), () => state.AlwaysOnTop);
@@ -420,7 +423,9 @@ public partial class MainWindow : Window
     private void Notes_Changed(object sender, TextChangedEventArgs e) { if (!ready) return; state.Notes = NotesBox.Text; SaveStatus.Text = "Saving…"; saveTimer.Stop(); saveTimer.Start(); }
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
-    private async void Add_Click(object sender, RoutedEventArgs e)
+    private void Add_Click(object sender, RoutedEventArgs e) => ShowGadgetGallery();
+
+    private async void ArrangeGadgets_Click(object sender, RoutedEventArgs e)
     {
         if (dialogOpen) { ActivatePreferences(); return; }
         var panel = new StackPanel { Spacing = 12 };
@@ -549,6 +554,7 @@ public partial class MainWindow : Window
             if (id is not null) { string selected = id; string label = id is "Clock" or "Quick launch" ? id + " card appearance…" : $"Customize {id}…"; Item(label, () => CustomizeCard(selected)); break; }
         }
         Item("Categories and gadgets…", () => Add_Click(this, new RoutedEventArgs()));
+        Item("Open app launcher…", () => OpenLauncher_Click(this, new RoutedEventArgs()));
         Item("Settings…", () => Settings_Click(this, new RoutedEventArgs()));
         Item("Customize clock…", () => CustomizeClock_Click(this, new RoutedEventArgs()));
         Item("Customize Quick launch…", () => CustomizeLaunch_Click(this, new RoutedEventArgs()));
@@ -684,6 +690,8 @@ public partial class MainWindow : Window
 
 public sealed class SidebarState
 {
+    public string AppearancePreset { get; set; } = "";
+    public string OperatingMode { get; set; } = "Desktop Sidebar";
     public string Notes { get; set; } = "";
     public string Material { get; set; } = "Acrylic";
     public string Theme { get; set; } = "System";
@@ -745,6 +753,11 @@ public sealed class SidebarState
     public int SlideInterval { get; set; } = 10;
     public bool SlidePaused { get; set; }
     public string PuzzlePicture { get; set; } = "";
+    public string PuzzleImageMode { get; set; } = "";
+    public bool PuzzleNumberLabels { get; set; }
+    public string PuzzleSampleId { get; set; } = "Lakeside";
+    public bool PuzzleRotateSamples { get; set; } = true;
+    public bool FeedShowThumbnails { get; set; } = true;
     public int[]? PuzzleTiles { get; set; }
     public int PuzzleMoves { get; set; }
     public string FeedUrl { get; set; } = "";

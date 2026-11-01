@@ -6,7 +6,9 @@ A native C# / WinUI 3 desktop sidebar inspired by Windows Vista and Windows 7, w
 
 ## Install
 
-Download the x64 MSI from [Releases](https://github.com/clustifle/windows-sidebar-fluent/releases). It installs for the current user, creates desktop and Start menu shortcuts, and supports uninstall through Windows Settings. User notes and preferences are kept when uninstalling.
+Download the x64 MSI from [Releases](https://github.com/clustifle/windows-sidebar-fluent/releases). It installs for the current user, includes a Start menu shortcut and an optional desktop shortcut, and supports uninstall through Windows Settings. User notes and preferences are kept when uninstalling.
+
+The setup wizard includes installation-folder selection, desktop-shortcut and startup choices, a review page, progress, and an optional launch on completion. Repair and removal use the same installer.
 
 Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica. The package includes the .NET and Windows App SDK runtimes. The installer is not code-signed.
 
@@ -16,7 +18,7 @@ Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica
 - Drag a gadget by its card background or heading to reorder it, including the clock. Hold over a page arrow to move between pages.
 - Right-click for Settings, gadget selection, clock and Quick Launch customization, startup, and Exit.
 - The app stays out of the taskbar and Alt+Tab. Its tray icon may appear in the Windows tray overflow.
-- Settings offer Light, Dark, or System theme; Acrylic/Mica; width; left/right docking; and optional animated auto-hide.
+- Settings offer Fluent, Vista, and Longhorn 4074 appearances independently of Desktop Sidebar/Launcher mode, plus Light/Dark/System, Acrylic/Mica, width, docking, and animated auto-hide.
 - Docked mode reserves desktop space. Auto-hide keeps only a thin reveal strip and overlays the sidebar when opened.
 
 ## Longhorn mode
@@ -37,6 +39,8 @@ Expand any gadget under Gadgets, or right-click its card and choose Customize. E
 
 Content controls include clock faces/time zones/display; calendar week start, adjacent dates, and Today; note text size and writing height; performance refresh rate; timer duration and sound; storage drive; slideshow folder/interval/fit/file name; puzzle picture/numbered tiles/move count; feed address/count/interval; and Quick Launch columns/icon size/apps/websites.
 
+Right-click the sidebar and choose **Open app launcher** for the app grid, searchable installed apps and pinned websites, and an on-demand running-window list. Right-click app tiles to pin or unpin them. Launcher mode adds an Apps entry and search to the sidebar; it keeps the Windows taskbar visible.
+
 Quick Launch has Pinned, Apps, and Web tabs. Import copies accessible taskbar `.lnk` shortcuts without changing Windows' pins. Installed apps can be selected in Quick Launch customization. Rail search suggestions include app icons. Selecting an app launches it; submitting another query opens Windows file search.
 
 Background work follows visibility: offscreen gadgets skip live updates, hidden auto-hide mode slows the gadget timer, and slideshow/panel polling stops when unused. App icons use a bounded memory cache. A visible second hand or active countdown still requires one-second updates. Neither mode keeps a background shell helper running.
@@ -52,15 +56,17 @@ Sidebar renegotiates screen space on taskbar/work-area changes, including top, b
 | Notes | Local autosave and adjustable height |
 | CPU meter | CPU and physical-memory gauges |
 | Slide Show | Local pictures, previous/next, pause/play, adjustable interval |
-| Picture Puzzle | Solvable sliding puzzle, optional local picture, saved progress |
-| Feed Headlines | RSS/Atom, configurable headline count and interval, visible-only refresh |
+| Picture Puzzle | Six nature pictures, custom pictures or numbers, reference preview, optional tile labels, keyboard controls, and saved progress |
+| Feed Headlines | RSS/Atom with provider thumbnails, configurable headline count and interval, visible-only refresh |
 | Quick Launch | Search installed apps, embedded app icons, website shortcuts, rename/reorder/remove |
 | Timer | Start, pause/resume, reset, completion sound |
 | Storage | System-drive usage and free space |
 
-Additional gadgets can be enabled from **+**. Picture folders, puzzle pictures, and feed URLs are chosen by the user. No example headlines or weather values are presented as live data.
+The **+** button opens a searchable gadget gallery with categories, descriptions, and enabled states. Picture folders, puzzle pictures, and feed URLs are chosen by the user. No example headlines or weather values are presented as live data.
 
 App search opens its results toward the desktop, with a fixed readable panel width, app icons, and full-name tooltips. Auto-hide waits while the results are open. Moving the rail closes the results first.
+
+Picture Puzzle includes six nature illustrations and starts with Lakeside. Shuffle changes the nature sample; turn off sample rotation to keep one picture. The picture-options button switches between the sample, your own picture, and numbered tiles; the eye button shows the reference. Focus a tile to use the arrow keys. Once solved, the tiles merge into one continuous picture without tile gaps or number labels. Choose **Play again** to return to the tiles. Picture changes keep the current arrangement and move count.
 
 ## Build from source
 
@@ -78,6 +84,7 @@ Install WiX 6.0.2 and run the installer authoring script:
 
 ```powershell
 dotnet tool install --global wix --version 6.0.2 --allow-roll-forward
+wix extension add -g WixToolset.UI.wixext/6.0.2
 .\tools\Build-Installer.ps1
 ```
 
@@ -87,7 +94,7 @@ The MSI is written to `artifacts\installer`. `tools\Build-Icon.ps1` regenerates 
 
 ## Data and startup
 
-Preferences, shortcut icons, and notes are stored in `%LOCALAPPDATA%\ClassicSidebar\settings.json`. Startup is optional and uses the current user's Run entry named `FluentSidebar` (the previous startup entry migrates automatically). The app does not upload preferences or notes. Network requests are made to a feed address only after the user configures it; article and website links open when clicked.
+Preferences, shortcut icons, and notes are stored in `%LOCALAPPDATA%\ClassicSidebar\settings.json`. Startup is optional and uses the current user's Run entry named `FluentSidebar` (the previous startup entry migrates automatically). The app does not upload preferences or notes. Network requests go to configured feed addresses and provider-supplied thumbnail URLs while the feed card is visible. Article and website links open when clicked.
 
 ## Scope and verification
 
