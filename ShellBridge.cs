@@ -32,6 +32,8 @@ internal sealed class ShellBridge : IAsyncDisposable
     [DllImport("user32.dll")] private static extern bool AllowSetForegroundWindow(uint processId);
     public static void Restore()
     {
+        string recovery = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ClassicSidebar");
+        if (!File.Exists(Path.Combine(recovery, "taskbar-recovery.txt")) && !File.Exists(Path.Combine(recovery, "taskbar-region-recovery.json"))) return;
         string path = Path.Combine(AppContext.BaseDirectory, "FluentSidebar.ShellHost.exe");
         if (!File.Exists(path)) return;
         try { Process.Start(new ProcessStartInfo(path, "--restore") { UseShellExecute = false, CreateNoWindow = true }); } catch (System.ComponentModel.Win32Exception) { }

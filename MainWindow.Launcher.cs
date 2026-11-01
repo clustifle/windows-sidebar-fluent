@@ -78,6 +78,13 @@ public partial class MainWindow
                 { writer.WriteBytes(Convert.FromBase64String(shortcut.IconData)); await writer.StoreAsync(); }
                 stream.Seek(0);
                 bitmap = new BitmapImage(); await bitmap.SetSourceAsync(stream);
+                if (shortcutImages.Count >= 96)
+                {
+                    var pinned = state.Shortcuts.Select(item => item.Target).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    string? oldest = shortcutImages.Keys.FirstOrDefault(key => !pinned.Contains(key));
+                    oldest ??= shortcutImages.Keys.First();
+                    shortcutImages.Remove(oldest);
+                }
                 shortcutImages[shortcut.Target] = bitmap;
             }
             if (image.Tag as string != shortcut.Target) return;

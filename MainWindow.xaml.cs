@@ -167,7 +167,6 @@ public partial class MainWindow : Window
         Root.Background = RailSurfaceBrush(requestedTheme);
         ApplyLonghornVisuals();
         if (ready) ApplyCardCustomizations();
-        SynchronizeShellPanelTheme();
         if (preferencesWindow?.SystemBackdrop is SidebarBackdrop settingsBackdrop) settingsBackdrop.SetTheme(requestedTheme);
         if (preferencesWindow?.Content is FrameworkElement preferencesRoot)
         {
@@ -194,7 +193,7 @@ public partial class MainWindow : Window
 
     private void PositionSidebar()
     {
-        appBar?.Configure(state.Left, state.AlwaysOnTop, SidebarWidth, state.AutoHide, taskbarReplacementActive);
+        appBar?.Configure(state.Left, state.AlwaysOnTop, SidebarWidth, state.AutoHide, false);
         ApplyAutoHidePreference();
     }
 
@@ -275,8 +274,9 @@ public partial class MainWindow : Window
 
     private void UpdateGadgets()
     {
+        if (state.AutoHide && autoHidden) { UpdateDesktopStatus(); UpdateTimerInterval(); return; }
         var now = DateTime.Now;
-        if (ClockGadget.Visibility == Visibility.Visible)
+        if (IsGadgetOnScreen(ClockGadget))
         {
             var clockNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, clockTimeZone).DateTime;
             string format = state.ClockTimeFormat switch { "12-hour" => state.ShowSeconds ? "h:mm:ss tt" : "h:mm tt", "24-hour" => state.ShowSeconds ? "HH:mm:ss" : "HH:mm", _ => state.ShowSeconds ? "T" : "t" };
@@ -337,14 +337,20 @@ public partial class MainWindow : Window
 
     private void UpdateTimerInterval()
     {
-        bool active = ClockGadget.Visibility == Visibility.Visible || timerDeadline.HasValue || SystemGadget.Visibility == Visibility.Visible;
-        var interval = TimeSpan.FromSeconds(active ? 1 : 30);
+        double seconds = 30;
+        if (!(state.AutoHide && autoHidden))
+        {
+            if (IsGadgetOnScreen(ClockGadget)) seconds = state.ShowSeconds || (state.ClockStyle != "Digital" && state.ClockSecondHand) ? 1 : Math.Max(1, 60 - DateTime.Now.Second);
+            if (IsGadgetOnScreen(SystemGadget)) seconds = Math.Min(seconds, Math.Clamp(state.PerformanceInterval, 1, 10));
+        }
+        if (timerDeadline.HasValue) seconds = 1;
+        var interval = TimeSpan.FromSeconds(seconds);
         if (timer.Interval != interval) timer.Interval = interval;
     }
 
     private void UpdatePerformance()
     {
-        if (SystemGadget.Visibility != Visibility.Visible) { previousKernel = 0; return; }
+        if (!IsGadgetOnScreen(SystemGadget)) { previousKernel = 0; return; }
         if (DateTime.UtcNow < nextPerformanceUpdate) return;
         nextPerformanceUpdate = DateTime.UtcNow.AddSeconds(Math.Clamp(state.PerformanceInterval, 1, 10));
         if (GetSystemTimes(out ulong idle, out ulong kernel, out ulong user))
@@ -540,7 +546,7 @@ public partial class MainWindow : Window
         for (DependencyObject? node = e.OriginalSource as DependencyObject; node is not null; node = VisualTreeHelper.GetParent(node))
         {
             string? id = state.GadgetOrder.FirstOrDefault(id => ReferenceEquals(GadgetElement(id), node));
-            if (id is not null) { string selected = id; Item($"Customize {id}…", () => CustomizeCard(selected)); break; }
+            if (id is not null) { string selected = id; string label = id is "Clock" or "Quick launch" ? id + " card appearance…" : $"Customize {id}…"; Item(label, () => CustomizeCard(selected)); break; }
         }
         Item("Categories and gadgets…", () => Add_Click(this, new RoutedEventArgs()));
         Item("Settings…", () => Settings_Click(this, new RoutedEventArgs()));
@@ -554,12 +560,6 @@ public partial class MainWindow : Window
         top.Click += (_, _) => { state.AlwaysOnTop = top.IsChecked; ApplyState(); Save(); };
         menu.Items.Add(top);
         menu.Items.Add(new MenuFlyoutSeparator());
-        if (state.LonghornMode)
-        {
-            var keepTaskbar = new ToggleMenuFlyoutItem { Text = "Keep Windows taskbar visible", IsChecked = !state.LonghornHideTaskbar };
-            keepTaskbar.Click += async (_, _) => { state.LonghornHideTaskbar = !keepTaskbar.IsChecked; ApplyLonghornSections(); Save(); await UpdateTaskbarOptionsAsync(); };
-            menu.Items.Add(keepTaskbar);
-        }
         Item("Exit FluentSidebar", Close);
         menu.Opened += (_, _) => { sidebarMenuOpen = true; hideTimer.Stop(); };
         menu.Closed += (_, _) => { sidebarMenuOpen = false; QueueAutoHide(); };
@@ -645,11 +645,10 @@ public partial class MainWindow : Window
             {
                 TimerText.Text = "Time is up"; timerDeadline = null; pausedTimer = TimeSpan.Zero; TimerStart.Content = "Start";
                 if (state.TimerSound) MessageBeep(0x40);
-                AddLocalNotification("Timer", "Your timer has finished.");
             }
             else TimerText.Text = $"{(int)remaining.TotalMinutes:00}:{remaining.Seconds:00}";
         }
-        if (StorageCategory.Visibility != Visibility.Visible || DateTime.UtcNow < nextStatusUpdate) return;
+        if (!IsGadgetOnScreen(StorageCategory) || DateTime.UtcNow < nextStatusUpdate) return;
         nextStatusUpdate = DateTime.UtcNow.AddSeconds(30);
         try
         {
@@ -692,7 +691,7 @@ public sealed class SidebarState
     public bool CompactClock { get; set; } = true;
     public bool LonghornMode { get; set; }
     public bool LonghornHideTaskbar { get; set; }
-    public bool LonghornHideSystemTray { get; set; } = true;
+    public bool LonghornHideSystemTray { get; set; }
     public int LonghornWidth { get; set; } = 168;
     public bool LonghornBottomClock { get; set; } = true;
     public bool LonghornShowPins { get; set; } = true;

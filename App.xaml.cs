@@ -20,7 +20,7 @@ public partial class App : Application
             window.Activate();
             window.AttachToDesktop();
 #if THEME_REGRESSION
-            window.RunThemeRegression();
+            window.DispatcherQueue.TryEnqueue(async () => { await Task.Delay(2500); window.RunThemeRegression(); });
 #endif
         }
         catch (Exception ex) { LogFailure(ex); throw; }

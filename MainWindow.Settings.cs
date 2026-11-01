@@ -39,12 +39,7 @@ public partial class MainWindow
         Number(longhornPanel, "Rail width", 156, 280, state.LonghornWidth, value => state.LonghornWidth = value);
         AddToggle(longhornPanel, "Dock clock at the bottom", state.LonghornBottomClock, value => state.LonghornBottomClock = value);
         AddToggle(longhornPanel, "Show pinned launchers", state.LonghornShowPins, value => { state.LonghornShowPins = value; ApplyLonghornSections(); });
-        var keep = new ToggleSwitch { Header = "Keep Windows taskbar visible", IsOn = !state.LonghornHideTaskbar };
-        keep.Toggled += async (_, _) => { if (state.LonghornHideTaskbar == !keep.IsOn) return; state.LonghornHideTaskbar = !keep.IsOn; ApplyLonghornSections(); Save(); await UpdateTaskbarOptionsAsync(); }; longhornPanel.Children.Add(keep);
-        var hideTray = new ToggleSwitch { Header = "Hide Windows taskbar tray and clock", IsOn = state.LonghornHideSystemTray };
-        hideTray.Toggled += async (_, _) => { if (state.LonghornHideSystemTray == hideTray.IsOn) return; state.LonghornHideSystemTray = hideTray.IsOn; Save(); await UpdateTaskbarOptionsAsync(); }; longhornPanel.Children.Add(hideTray);
-        longhornPanel.Children.Add(new TextBlock { Text = "Compatibility option: keeps Start and app buttons, hides the original system area, and restores the taskbar on exit. If the system area cannot be identified, its original layout is kept.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
-        longhornPanel.Children.Add(new TextBlock { Text = "With the taskbar visible, Start and Apps stay on Windows' taskbar. Running-app and background-app tray strips are hidden in the rail. Explorer continues to provide the desktop and Start menu.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        longhornPanel.Children.Add(new TextBlock { Text = "Longhorn mode keeps the original Windows taskbar visible, including Start, apps, Quick Settings, notifications, clock, and input controls. The rail contains search, pinned launchers, and gadgets.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         var behavior = Section("Behavior");
         AddToggle(behavior, "Auto-hide at screen edge", state.AutoHide, value => state.AutoHide = value);
         behavior.Children.Add(new TextBlock { Text = "Auto-hide keeps the rail visible on the desktop. Switching to an app resumes edge auto-hide.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
@@ -52,7 +47,7 @@ public partial class MainWindow
         side.Toggled += async (_, _) => { if (side.IsOn != state.Left) await MoveSidebarAsync(side.IsOn); }; behavior.Children.Add(side);
         AddToggle(behavior, "Keep above other windows", state.AlwaysOnTop, value => state.AlwaysOnTop = value);
         AddToggle(behavior, "Start with Windows", StartupPreference.Enabled, SetStartup);
-        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 1.2.0 preview. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
+        behavior.Children.Add(new TextBlock { Text = "FluentSidebar 1.3.0 preview. Preferences and notes stay on this device. Closing the app restores reserved desktop space and the Windows taskbar.", FontSize = 12, TextWrapping = TextWrapping.Wrap });
         return tabs;
     }
     private void ActivatePreferences()

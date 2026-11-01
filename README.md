@@ -21,19 +21,13 @@ Windows 10 version 2004 or newer is required; Windows 11 is recommended for Mica
 
 ## Longhorn mode
 
-A continuous translucent rail inspired by [build 4074](https://betawiki.net/wiki/Windows_Longhorn_build_4074#Gallery). Search and pinned launchers sit at the top, tiles scroll through the middle, and the clock can dock at the bottom. Its default width is 168 logical pixels. Width and tile order are saved separately from ordinary sidebar mode. When the Windows taskbar is hidden, the rail covers the full monitor height.
+A continuous translucent rail inspired by [build 4074](https://betawiki.net/wiki/Windows_Longhorn_build_4074#Gallery). Search and pinned launchers sit at the top, tiles scroll through the middle, and the clock can dock at the bottom. Its default width is 168 logical pixels. Width and tile order are saved separately from ordinary sidebar mode.
 
-**Keep Windows taskbar visible** lets both interfaces run together. Start and Apps buttons disappear from the rail in this mode. **Hide Windows taskbar tray and clock** clips the original system area while leaving Start and app buttons visible. This compatibility option preserves the original window region and restores it when disabled, on exit, or during crash recovery. If Windows does not expose a reliable tray region, no clipping is applied. Turn **Keep Windows taskbar visible** off to show the rail's blue Windows 11 Start logo and Apps launcher while hiding the Windows taskbar. **Restore Windows taskbar** shows it again without turning Longhorn mode off. Explorer keeps the desktop, files, and real Windows Start menu; the login shell is never changed.
+The original Windows taskbar stays visible and intact, including Start, running apps, tray, clock, Quick Settings, notifications, and input controls. The rail has no Start or Apps button, Quick Settings, Notifications, or Language Input Switcher. Old taskbar-hiding and tray-clipping preferences are reset during startup. A recovery helper runs briefly only if an older version left taskbar recovery data; neither sidebar mode keeps a shell helper running.
 
-Running-app and background-app tray strips are removed. The helper does not host the Windows tray or track running windows. It handles optional taskbar hiding, reversible system-area clipping, parent-process monitoring, and taskbar recovery. FluentSidebar's own settings/exit tray icon remains in the Windows notification area.
+Drag the clock into the tile area to undock it, or back to the bottom dock. Clock customization includes this setting and a silver Longhorn face. Card heights stay fixed while live content changes; excess content scrolls inside each card. The calendar reserves six weeks, and the puzzle stays square.
 
-Quick Settings, Notifications, and Input Language open FluentSidebar's own WinUI flyouts. Quick Settings controls the default output volume and mute, shows connection status, and offers Wi-Fi/Bluetooth radio controls when Windows permits them. Radio access is requested only after the user changes a toggle. The language picker lists loaded Windows keyboard layouts and applies the selected layout to the previous application. There is no Windows Settings button in the rail. Flyouts open outside the narrow sidebar and use their own explicit light/dark surface; controls and notification icons use the Microsoft Fluent Options and Alert glyphs.
-
-Notifications shows FluentSidebar alerts, including timer completion. Reading other apps' Windows notifications requires a signed packaged build with the notification-listener capability and user permission. The current unpackaged MSI cannot provide that access, and its panel says so instead of showing an unusable permission button.
-
-Drag the clock into the tile area to undock it, or back to the bottom dock. Clock customization also includes this setting and a silver Longhorn face. Card heights stay fixed while live content changes; excess content scrolls inside each card. The calendar always reserves six weeks. The puzzle stays square and animates tile moves without recreating its buttons.
-
-With auto-hide enabled, focusing the desktop keeps the sidebar visible. Switching to an app resumes edge auto-hide. A foreground-window event hook avoids continuous polling. The native window and backdrop move together; interrupted transitions reverse from their current position. Windows' reduced-animation preference is respected.
+With auto-hide enabled, focusing the desktop keeps the sidebar visible. Switching to an app resumes edge auto-hide. A foreground-window event hook avoids continuous polling. Transitions reverse from their current position and respect Windows' reduced-animation preference.
 
 ## Settings and card customization
 
@@ -43,7 +37,9 @@ Expand any gadget under Gadgets, or right-click its card and choose Customize. E
 
 Content controls include clock faces/time zones/display; calendar week start, adjacent dates, and Today; note text size and writing height; performance refresh rate; timer duration and sound; storage drive; slideshow folder/interval/fit/file name; puzzle picture/numbered tiles/move count; feed address/count/interval; and Quick Launch columns/icon size/apps/websites.
 
-Quick Launch has Pinned, Apps, and Web tabs. Import copies accessible taskbar `.lnk` shortcuts without changing Windows' pins. The Apps launcher is a searchable icon grid with lazily loaded icons. Typing in the rail search box suggests installed apps; selecting a suggestion launches it, while submitting another query opens Windows file search.
+Quick Launch has Pinned, Apps, and Web tabs. Import copies accessible taskbar `.lnk` shortcuts without changing Windows' pins. Installed apps can be selected in Quick Launch customization. Rail search suggestions include app icons. Selecting an app launches it; submitting another query opens Windows file search.
+
+Background work follows visibility: offscreen gadgets skip live updates, hidden auto-hide mode slows the gadget timer, and slideshow/panel polling stops when unused. App icons use a bounded memory cache. A visible second hand or active countdown still requires one-second updates. Neither mode keeps a background shell helper running.
 
 Sidebar renegotiates screen space on taskbar/work-area changes, including top, bottom, left, and right taskbars. Broader testing on movable-taskbar releases and multiple displays is still needed.
 
@@ -83,7 +79,7 @@ dotnet tool install --global wix --version 6.0.2 --allow-roll-forward
 .\tools\Build-Installer.ps1
 ```
 
-Publishing also builds the shell helper and includes its Windows desktop runtime. The two executables share the bundled .NET runtime files. The helper is not loaded in ordinary sidebar mode.
+Publishing also builds the shell helper and includes its Windows desktop runtime. The two executables share the bundled .NET runtime files. The helper is used only to restore taskbar state left by an older version, then exits.
 
 The MSI is written to `artifacts\installer`. `tools\Build-Icon.ps1` regenerates the multi-resolution app icon from the included Fluent artwork.
 

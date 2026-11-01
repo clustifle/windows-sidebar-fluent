@@ -1,17 +1,13 @@
-<Window x:Class="Sidebar.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="Sidebar">
+<Window x:Class="Sidebar.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="using:Sidebar" Title="FluentSidebar">
  <Grid x:Name="Root" Padding="10,8,10,10" RowSpacing="8" Background="Transparent" RightTapped="Sidebar_RightTapped">
   <Grid.Resources>
+   <DataTemplate x:Key="AppSearchResultTemplate"><Grid Width="288" Padding="8" ColumnSpacing="10" Loaded="AppSearchResult_Loaded"><Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition/></Grid.ColumnDefinitions><Grid Width="28" Height="28"><FontIcon x:Name="SearchFallback" Glyph="&#xE8A5;" FontSize="22"/><Image x:Name="SearchIcon" Width="28" Height="28" Visibility="Collapsed"/></Grid><TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextWrapping="Wrap" MaxLines="2" FontSize="14"/></Grid></DataTemplate>
    <Style x:Key="RailButton" TargetType="Button"><Setter Property="HorizontalAlignment" Value="Stretch"/><Setter Property="HorizontalContentAlignment" Value="Left"/><Setter Property="Padding" Value="6,8"/><Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/></Style>
    <Style x:Key="GadgetTile" TargetType="Border"><Setter Property="Padding" Value="12"/><Setter Property="CornerRadius" Value="8"/><Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}"/><Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
   </Grid.Resources>
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <StackPanel x:Name="LonghornHeader" Grid.Row="0" Visibility="Collapsed" Spacing="4">
-   <Grid x:Name="LonghornLaunchButtons" ColumnSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition Width="28"/><ColumnDefinition/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
-    <Button Click="LonghornStart_Click" AutomationProperties.Name="Start" ToolTipService.ToolTip="Start" Padding="3" MinWidth="0" Background="Transparent" BorderThickness="0"><Image Width="20" Height="20" Source="ms-appx:///Assets/Windows11Start.svg" AutomationProperties.Name="Windows 11 Start"/></Button>
-    <Button Grid.Column="1" Click="LonghornApps_Click" Content="Apps" FontSize="11" Padding="4" Background="Transparent" BorderThickness="0" HorizontalAlignment="Stretch"/>
-    <Button Grid.Column="2" Click="RestoreTaskbar_Click" AutomationProperties.Name="Restore Windows taskbar" ToolTipService.ToolTip="Restore Windows taskbar" Padding="4" MinWidth="0" Background="Transparent" BorderThickness="0"><FontIcon Glyph="&#xE777;" FontSize="12"/></Button>
-   </Grid>
-   <AutoSuggestBox x:Name="LonghornSearch" PlaceholderText="Search for…" QueryIcon="Find" FontSize="12" MinWidth="0" TextMemberPath="Name" DisplayMemberPath="Name" TextChanged="LonghornSearch_TextChanged" SuggestionChosen="LonghornSearch_SuggestionChosen" QuerySubmitted="LonghornSearch_QuerySubmitted" AutomationProperties.Name="Search apps or files"/>
+   <AutoSuggestBox x:Name="LonghornSearch" PlaceholderText="Search for…" QueryIcon="Find" FontSize="12" MinWidth="0" TextMemberPath="Name" ItemTemplate="{StaticResource AppSearchResultTemplate}" MaxSuggestionListHeight="420" TextChanged="LonghornSearch_TextChanged" SuggestionChosen="LonghornSearch_SuggestionChosen" QuerySubmitted="LonghornSearch_QuerySubmitted" AutomationProperties.Name="Search apps or files"/>
   </StackPanel>
   <ScrollViewer x:Name="GadgetScroller" Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto" Padding="0,0,4,0"><StackPanel x:Name="GadgetStack" Spacing="12">
   <Border x:Name="ClockGadget" Style="{StaticResource GadgetTile}" DoubleTapped="Clock_DoubleTapped"><StackPanel Spacing="4" HorizontalAlignment="Center">
@@ -85,7 +81,6 @@
   </StackPanel>
   <StackPanel x:Name="LonghornBottom" Grid.Row="5" Visibility="Collapsed" Spacing="2">
    <StackPanel x:Name="LonghornClockDock" AllowDrop="True" MinHeight="12" AutomationProperties.Name="Bottom clock dock"/>
-   <Grid x:Name="LonghornSystemButtons" ColumnSpacing="2"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions></Grid>
   </StackPanel>
   <TextBlock Grid.Row="4" x:Name="PanelStatus" FontSize="11" TextWrapping="Wrap" Visibility="Collapsed" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
  </Grid>

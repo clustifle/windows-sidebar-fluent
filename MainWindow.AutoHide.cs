@@ -23,12 +23,14 @@ public partial class MainWindow
     {
         ElementCompositionPreview.SetIsTranslationEnabled(Root, true);
         autoHideInitialized = true;
+        Root.Loaded += (_, _) => UpdateGadgets();
+        GadgetScroller.ViewChanged += (_, args) => { if (!args.IsIntermediate) UpdateGadgets(); };
         Root.PointerEntered += (_, _) => RevealSidebar();
         Root.PointerExited += (_, _) => QueueAutoHide();
         hideTimer.Tick += (_, _) =>
         {
             hideTimer.Stop();
-            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && !shellPanelOpen && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
+            if (state.AutoHide && !desktopActive && !dialogOpen && !classicPickerOpen && !sidebarMenuOpen && draggingGadget is null && !CursorInsideSidebar()) HideSidebar();
         };
         revealTimer.Tick += (_, _) => AdvanceReveal();
         foregroundCallback = (_, _, _, _, _, _, _) => DispatcherQueue.TryEnqueue(UpdateDesktopVisibility);
@@ -47,7 +49,7 @@ public partial class MainWindow
 
     private void QueueAutoHide()
     {
-        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || shellPanelOpen || draggingGadget is not null) return;
+        if (!autoHideInitialized || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive || dialogOpen || classicPickerOpen || sidebarMenuOpen || draggingGadget is not null) return;
         hideTimer.Stop(); hideTimer.Start();
     }
 
@@ -56,13 +58,14 @@ public partial class MainWindow
         if (!autoHideInitialized || sidebarClosed || sideMoveRunning) return;
         hideTimer.Stop();
         autoHidden = false;
+        UpdateGadgets();
         BeginReveal(1);
     }
 
     private void HideSidebar()
     {
         if (autoHidden || sidebarClosed || sideMoveRunning || !state.AutoHide || desktopActive) return;
-        autoHidden = true; BeginReveal(0);
+        autoHidden = true; slideTimer.Stop(); UpdateTimerInterval(); BeginReveal(0);
     }
 
     private void BeginReveal(double target)
@@ -105,7 +108,6 @@ public partial class MainWindow
         var name = new System.Text.StringBuilder(128); GetClassName(foreground, name, name.Capacity);
         string windowClass = name.ToString();
         if (windowClass is "Shell_TrayWnd" or "Shell_SecondaryTrayWnd") return;
-        if (windowClass is not ("Progman" or "WorkerW" or "#32768")) lastExternalWindow = foreground;
         desktopActive = windowClass is "Progman" or "WorkerW" || foreground == GetShellWindow();
         if (desktopActive) RevealSidebar(); else QueueAutoHide();
     }
@@ -138,7 +140,7 @@ public partial class MainWindow
                 if (animate) { Animate(0, state.Left ? -48 : 48, 1, 0, 120); await Task.Delay(130); }
                 if (sidebarClosed) return;
                 state.Left = destination;
-                appBar?.Configure(state.Left, state.AlwaysOnTop, SidebarWidth, state.AutoHide, taskbarReplacementActive);
+                appBar?.Configure(state.Left, state.AlwaysOnTop, SidebarWidth, state.AutoHide, false);
                 if (animate) { Animate(state.Left ? -48 : 48, 0, 0, 1, 200); await Task.Delay(210); }
             }
         }

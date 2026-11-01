@@ -39,19 +39,19 @@ public partial class MainWindow
     private void UpdateClassicGadgets()
     {
         if (!classicInitialized || sidebarClosed) return;
-        if (SlideShowGadget.Visibility == Visibility.Visible)
+        if (IsGadgetOnScreen(SlideShowGadget))
         {
             if (state.SlideFolder != loadedSlideFolder && !slideLoading) _ = LoadSlideFolder();
             slideTimer.Interval = TimeSpan.FromSeconds(Math.Clamp(state.SlideInterval, 5, 120));
             if (!slidePaused && slideFiles.Length > 1) slideTimer.Start(); else slideTimer.Stop();
         }
         else slideTimer.Stop();
-        if (PuzzleGadget.Visibility == Visibility.Visible && (!puzzleRendered || puzzleRenderWidth != SidebarWidth || renderedPuzzleRail != state.LonghornMode))
+        if (IsGadgetOnScreen(PuzzleGadget) && (!puzzleRendered || puzzleRenderWidth != SidebarWidth || renderedPuzzleRail != state.LonghornMode))
         {
             if (!puzzleRendered && System.IO.File.Exists(state.PuzzlePicture)) LoadPuzzleImage(state.PuzzlePicture);
             RenderPuzzle();
         }
-        if (FeedsGadget.Visibility == Visibility.Visible && !feedLoading && DateTime.UtcNow >= nextFeedRefresh && !string.IsNullOrWhiteSpace(state.FeedUrl)) _ = RefreshFeed(false);
+        if (IsGadgetOnScreen(FeedsGadget) && !feedLoading && DateTime.UtcNow >= nextFeedRefresh && !string.IsNullOrWhiteSpace(state.FeedUrl)) _ = RefreshFeed(false);
     }
 
     private async Task LoadSlideFolder()

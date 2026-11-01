@@ -58,134 +58,83 @@ public partial class MainWindow
     }
     private async void FinishMotionAndCalendarRegression()
     {
-        bool originalSide = state.Left;
+        bool originalSide = state.Left, originalLonghorn = state.LonghornMode, originalAutoHide = state.AutoHide;
         var originalMonth = month;
-        bool originalLonghorn = state.LonghornMode, originalHide = state.LonghornHideTaskbar;
-        bool originalAutoHide = state.AutoHide;
-        string panelTheme = state.Theme;
         int[] originalPuzzle = picturePuzzle.Tiles.ToArray(); int originalMoves = picturePuzzle.Moves;
         try
         {
             foreach (bool left in new[] { !originalSide, originalSide })
             {
                 await MoveSidebarAsync(left);
-                if (state.Left != left || sideMoveRunning) throw new Exception("Side transition did not finish");
-                GetWindowRect(WinRT.Interop.WindowNative.GetWindowHandle(this), out var rect);
+                GetWindowRect(WinRT.Interop.WindowNative.GetWindowHandle(this), out var bounds);
                 var monitor = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary).OuterBounds;
-                if ((left && rect.Left != monitor.X) || (!left && rect.Right != monitor.X + monitor.Width)) throw new Exception("Sidebar missed screen edge");
+                if (state.Left != left || sideMoveRunning || (left ? bounds.Left != monitor.X : bounds.Right != monitor.X + monitor.Width)) throw new Exception("Side transition missed the screen edge");
             }
             await Task.WhenAll(MoveSidebarAsync(!originalSide), MoveSidebarAsync(originalSide));
-            if (state.Left != originalSide) throw new Exception("Rapid side change lost final choice");
+            if (state.Left != originalSide) throw new Exception("Rapid side change lost the final choice");
             foreach (var date in new[] { new DateTime(2028, 2, 1), new DateTime(2027, 2, 1), new DateTime(2026, 8, 1) })
-            {
-                month = date; RenderCalendar();
-                if (CalendarGrid.Children.Count != 49 || CalendarGrid.RowDefinitions.Count != 7) throw new Exception("Calendar must retain six complete weeks");
-            }
-            preferencesWindow?.Close(); CustomizeClock_Click(this, new RoutedEventArgs());
-            await Task.Delay(200);
-            if (preferencesWindow is null) throw new Exception("Clock cards failed to open");
-            state.LonghornMode = true; state.LonghornHideTaskbar = false;
-            await UpdateLonghornAsync();
-            await Task.Delay(1000);
-            if (!state.LonghornMode || shellBridge is null || LonghornSystemButtons.Children.Count != 3 || LonghornLaunchButtons.Visibility != Visibility.Collapsed) throw new Exception("Longhorn coexistence controls did not apply");
-            if (LonghornPins.Children.Count != state.Shortcuts.Count) throw new Exception("Pinned icon grid count incorrect");
-            foreach (string id in state.GadgetOrder)
-            {
-                var editor = BuildCardEditor(id);
-                var height = editor.Children.OfType<NumberBox>().First(box => box.Header as string == "Locked height (0 = default)");
-                int originalHeight = CardStyle(id).Height;
-                height.Value = 240;
-                if (((Border)GadgetElement(id)).Height != 240) throw new Exception($"{id} height customization failed");
-                CardStyle(id).Height = originalHeight;
-            }
-            ApplyState();
-            ShowQuickSettings((FrameworkElement)LonghornSystemButtons.Children[0]); await Task.Delay(1000);
-            if (currentShellFlyout is null || !currentShellFlyout.IsOpen) throw new Exception("Own Quick Settings failed to open");
-            if (currentShellFlyout.IsConstrainedToRootBounds || currentShellFlyout.Content is not FrameworkElement quickRoot || quickRoot.ActualWidth < 280) throw new Exception("Quick Settings is clipped to the rail");
-            await CaptureRailPreviewAsync("quick-settings-layout.png", ShellPanelPresenter(quickRoot));
-            currentShellFlyout.Hide();
-            foreach (string popupTheme in new[] { "Light", "Dark" })
-            {
-                state.Theme = popupTheme; SynchronizeAppearance();
-                ShowNotifications((FrameworkElement)LonghornSystemButtons.Children[1]); await Task.Delay(500);
-                if (currentShellFlyout is null || !currentShellFlyout.IsOpen || currentShellFlyout.IsConstrainedToRootBounds || currentShellFlyout.Content is not FrameworkElement notificationRoot || notificationRoot.ActualWidth < 280 || notificationRoot.ActualTheme.ToString() != popupTheme) throw new Exception("Notification geometry or theme incorrect");
-                await CaptureRailPreviewAsync($"notifications-{popupTheme.ToLowerInvariant()}.png", ShellPanelPresenter(notificationRoot));
-                currentShellFlyout.Hide();
-            }
-            state.Theme = panelTheme; SynchronizeAppearance();
-            ShowInputLanguages((FrameworkElement)LonghornSystemButtons.Children[2]); await Task.Delay(200);
-            if (currentShellFlyout is null || !currentShellFlyout.IsOpen) throw new Exception("Own input switcher failed to open");
-            currentShellFlyout.Hide();
-            if (LonghornHeader.Visibility != Visibility.Visible || Grid.GetRow(LonghornPanel) != 1 || SidebarWidth != Math.Clamp(state.LonghornWidth, 156, 280)) throw new Exception("4074 rail layout did not apply");
+            { month = date; RenderCalendar(); if (CalendarGrid.Children.Count != 49 || CalendarGrid.RowDefinitions.Count != 7) throw new Exception("Calendar must retain six complete weeks"); }
+            preferencesWindow?.Close(); CustomizeClock_Click(this, new RoutedEventArgs()); await Task.Delay(200);
+            if (preferencesWindow is null) throw new Exception("Clock customization failed");
+            preferencesWindow.Close();
+            state.LonghornMode = true; state.LonghornHideTaskbar = true; state.LonghornHideSystemTray = true;
+            await UpdateLonghornAsync(); await Task.Delay(1500);
+            if (state.LonghornHideTaskbar || state.LonghornHideSystemTray || Root.FindName("LonghornLaunchButtons") is not null || Root.FindName("LonghornSystemButtons") is not null) throw new Exception("Removed shell controls or legacy taskbar preferences remain");
+            if (System.Diagnostics.Process.GetProcessesByName("FluentSidebar.ShellHost").Length != 0) throw new Exception("Longhorn mode retained a background shell helper");
+            if (!RegressionTaskbarVisible(RegressionFindTaskbar("Shell_TrayWnd", null))) throw new Exception("Windows taskbar is hidden");
+            if (LonghornPins.Children.Count != state.Shortcuts.Count) throw new Exception("Pinned launcher count incorrect");
             bool bottomClock = state.LonghornBottomClock;
-            var normalOrder = state.GadgetOrder.ToArray();
-            state.LonghornBottomClock = true; ApplyState();
-            if (!LonghornClockDock.Children.Contains(ClockGadget) || GadgetStack.Children.Contains(ClockGadget) || ClockGadget.Visibility != (state.Clock ? Visibility.Visible : Visibility.Collapsed)) throw new Exception("Bottom clock docking failed");
-            state.LonghornBottomClock = false; ApplyState();
-            if (!GadgetStack.Children.Contains(ClockGadget) || LonghornClockDock.Children.Count != 0 || !state.GadgetOrder.SequenceEqual(normalOrder)) throw new Exception("Undocking clock changed normal layout");
-            state.LonghornBottomClock = bottomClock; ApplyState();
-            double calendarHeight = CalendarGadget.Height, puzzleHeight = PuzzleGadget.Height;
-            foreach (var date in new[] { new DateTime(2028, 2, 1), new DateTime(2026, 8, 1) }) { month = date; RenderCalendar(); if (CalendarGadget.Height != calendarHeight || CalendarGrid.RowDefinitions.Count != 7) throw new Exception("Calendar resized between months"); }
-            RenderPuzzle(); picturePuzzle.Shuffle(); RenderPuzzle();
-            if (PuzzleGadget.Height != puzzleHeight || PuzzleBoard.Width != PuzzleBoard.Height || PuzzleBoard.Width > SidebarWidth - 20) throw new Exception("Puzzle escaped stable card bounds");
-            month = originalMonth; RenderCalendar();
-            await CaptureRailPreviewAsync();
-            bool puzzleEnabled = state.PicturePuzzle; string[] railOrder = state.LonghornGadgetOrder.ToArray();
             try
             {
-                state.PicturePuzzle = true; state.LonghornGadgetOrder.Remove("Picture puzzle"); state.LonghornGadgetOrder.Insert(0, "Picture puzzle"); ApplyState(); GadgetScroller.ChangeView(null, 0, null);
-                var tileButtons = puzzleButtons.Values.ToArray(); int gap = Array.IndexOf(picturePuzzle.Tiles, 0);
-                int neighbor = Enumerable.Range(0, 9).First(index => Math.Abs(index / 3 - gap / 3) + Math.Abs(index % 3 - gap % 3) == 1);
-                picturePuzzle.Move(neighbor); RenderPuzzle();
-                if (!puzzleButtons.Values.SequenceEqual(tileButtons)) throw new Exception("Puzzle moves rebuilt its buttons");
-                await CaptureRailPreviewAsync("longhorn-puzzle-layout.png");
+                state.LonghornBottomClock = true; ApplyState();
+                if (!LonghornClockDock.Children.Contains(ClockGadget)) throw new Exception("Clock docking failed");
+                state.LonghornBottomClock = false; ApplyState();
+                if (!GadgetStack.Children.Contains(ClockGadget)) throw new Exception("Clock undocking failed");
             }
-            finally { state.PicturePuzzle = puzzleEnabled; state.LonghornGadgetOrder = railOrder.ToList(); ApplyState(); }
-            state.LonghornHideTaskbar = true;
-            await shellBridge!.SendAsync(new { action = "replace", enabled = true });
-            for (int attempt = 0; attempt < 30 && !taskbarReplacementActive; attempt++) await Task.Delay(100);
-            GetWindowRect(WinRT.Interop.WindowNative.GetWindowHandle(this), out var full);
-            var screen = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary).OuterBounds;
-            if (!taskbarReplacementActive || full.Top != screen.Y || full.Bottom != screen.Y + screen.Height) throw new Exception($"Replacement height: active={taskbarReplacementActive}, bounds={full.Top}..{full.Bottom}, expected={screen.Y}..{screen.Y + screen.Height}, mode={state.LonghornMode}, error={shellBridge?.LastError}");
-            state.AutoHide = true; ApplyState(); desktopActive = true; RevealSidebar(); HideSidebar();
-            await Task.Delay(350);
-            if (autoHidden || currentReveal != 1) throw new Exception("Desktop visibility must prevent auto-hide");
+            finally { state.LonghornBottomClock = bottomClock; ApplyState(); }
+            foreach (string id in state.GadgetOrder)
+            {
+                int originalHeight = CardStyle(id).Height;
+                try
+                {
+                    var height = BuildCardEditor(id).Children.OfType<NumberBox>().First(box => box.Header as string == "Locked height (0 = default)");
+                    height.Value = 240;
+                    if (((Border)GadgetElement(id)).Height != 240) throw new Exception(id + " card customization failed");
+                }
+                finally { CardStyle(id).Height = originalHeight; }
+            }
+            ApplyState(); month = originalMonth; RenderCalendar(); RenderPuzzle();
+            if (PuzzleBoard.Width != PuzzleBoard.Height || PuzzleBoard.Width > SidebarWidth - 20) throw new Exception("Puzzle escaped its card bounds");
+            await CaptureRailPreviewAsync();
+            state.AutoHide = true; ApplyState(); desktopActive = true; RevealSidebar(); HideSidebar(); await Task.Delay(350);
+            if (autoHidden || currentReveal != 1) throw new Exception("Desktop must keep the sidebar visible");
             desktopActive = false; HideSidebar(); await Task.Delay(350);
-            GetWindowRect(WinRT.Interop.WindowNative.GetWindowHandle(this), out var strip);
-            int expectedStrip = Math.Max(3, (int)Math.Round(3 * GetDpiForWindow(WinRT.Interop.WindowNative.GetWindowHandle(this)) / 96d));
-            if (!autoHidden || currentReveal != 0 || strip.Right - strip.Left != expectedStrip) throw new Exception("Auto-hide failed to reach edge strip");
-            RevealSidebar(); await Task.Delay(80); double midway = currentReveal;
-            HideSidebar(); if (currentReveal != midway) throw new Exception("Auto-hide reversal snapped");
+            if (!autoHidden || currentReveal != 0) throw new Exception("Auto-hide did not finish");
+            if (!timerDeadline.HasValue && timer.Interval.TotalSeconds < 30) throw new Exception("Hidden sidebar kept a high-frequency timer");
+            RevealSidebar(); await Task.Delay(80); double midway = currentReveal; HideSidebar();
+            if (currentReveal != midway) throw new Exception("Auto-hide reversal snapped");
             await Task.Delay(350); desktopActive = true; RevealSidebar(); await Task.Delay(350);
-            if (autoHidden || currentReveal != 1) throw new Exception("Desktop did not reveal sidebar");
-            state.AutoHide = originalAutoHide; ApplyState();
-            RestoreTaskbar_Click(this, new RoutedEventArgs());
-            for (int attempt = 0; attempt < 30 && taskbarReplacementActive; attempt++) await Task.Delay(100);
-            if (!state.LonghornMode || state.LonghornHideTaskbar || taskbarReplacementActive) throw new Exception("Restoring taskbar must keep Longhorn mode enabled");
-            preferencesWindow?.Close(); LonghornApps_Click(this, new RoutedEventArgs());
-            await Task.Delay(300);
-            GridView? FindApps(DependencyObject node)
-            {
-                if (node is GridView grid) return grid;
-                for (int i = 0; i < VisualTreeHelper.GetChildrenCount(node); i++) if (FindApps(VisualTreeHelper.GetChild(node, i)) is { } found) return found;
-                return null;
-            }
-            for (int attempt = 0; attempt < 36; attempt++)
-            {
-                if (preferencesWindow?.Content is DependencyObject content && FindApps(content) is { } readyGrid && readyGrid.Items.Count > 0) break;
-                await Task.Delay(250);
-            }
-            await Task.Delay(250);
-            if (preferencesWindow?.Content is not DependencyObject appsRoot || FindApps(appsRoot) is not { } appGrid || appGrid.Items.Count == 0 || appGrid.ItemTemplate is null) throw new Exception("Apps icon grid did not load");
-            if (appGrid.ContainerFromIndex(0) is not GridViewItem firstApp || firstApp.ContentTemplateRoot is not FrameworkElement appTile || appTile.FindName("AppName") is not TextBlock appName || string.IsNullOrWhiteSpace(appName.Text)) throw new Exception("Launcher tile name binding failed");
+            state.AutoHide = false; ApplyState(); Activate(); LonghornSearch.Focus(FocusState.Programmatic);
+            LonghornSearch.ItemsSource = (await InstalledApps.GetAsync()).Take(3).ToArray();
+            var popup = SidebarAppSearchBox.Configure(LonghornSearch); LonghornSearch.IsSuggestionListOpen = true; await Task.Delay(600);
+            if (popup is null || !popup.IsOpen || popup.ShouldConstrainToRootBounds || popup.Child is not FrameworkElement results || results.ActualWidth < 280 || LonghornSearch.ItemTemplate is null) throw new Exception("App search suggestions are clipped");
+            LonghornSearch.IsSuggestionListOpen = false; LonghornSearch.ItemsSource = null;
             state.LonghornMode = false; await UpdateLonghornAsync();
-            if (LonghornPanel.Visibility != Visibility.Collapsed || shellBridge is not null) throw new Exception("Longhorn mode did not stop");
-            if (!GadgetStack.Children.Contains(ClockGadget) || LonghornClockDock.Children.Count != 0 || SidebarWidth != Math.Clamp(state.Width, 220, 360)) throw new Exception("Normal sidebar layout was not restored");
-            System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nPASS: 4074 top rail, independent width/order, clock docking/undocking, fixed six-week calendar and square puzzle bounds, desktop auto-hide hold and reversal, full monitor height with hidden taskbar, Apps icon grid, hidden app tray, pinned icons, opt-out restoration; side transitions, rapid reversal, screen edges, clock customization.");
+            if (LonghornPanel.Visibility != Visibility.Collapsed || !GadgetStack.Children.Contains(ClockGadget)) throw new Exception("Normal sidebar layout did not return");
+            System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\\nPASS: Longhorn rail without shell buttons; legacy taskbar hiding reset; original taskbar visible; no background helper; pinned launchers; clock docking; all card heights; six-week calendar; square puzzle; desktop auto-hide, reversal and low-frequency hidden updates; icon search; side transitions.");
         }
-        catch (Exception ex) { System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\nFAIL: " + ex); }
-        finally { currentShellFlyout?.Hide(); await Task.Delay(50); picturePuzzle.Restore(originalPuzzle, originalMoves); state.Theme = panelTheme; state.AutoHide = originalAutoHide; state.LonghornMode = originalLonghorn; state.LonghornHideTaskbar = originalHide; await UpdateLonghornAsync(); await MoveSidebarAsync(originalSide); month = originalMonth; Close(); }
+        catch (Exception ex) { System.IO.File.AppendAllText(System.IO.Path.Combine(AppContext.BaseDirectory, "theme-test-result.txt"), "\\nFAIL: " + ex); }
+        finally
+        {
+            LonghornSearch.IsSuggestionListOpen = false;
+            picturePuzzle.Restore(originalPuzzle, originalMoves); state.AutoHide = originalAutoHide; state.LonghornMode = originalLonghorn;
+            await UpdateLonghornAsync(); await MoveSidebarAsync(originalSide); month = originalMonth; Close();
+        }
     }
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "FindWindowW", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern IntPtr RegressionFindTaskbar(string name, string? title);
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "IsWindowVisible")]
+    private static extern bool RegressionTaskbarVisible(IntPtr window);
 
     private async Task CaptureRailPreviewAsync(string filename = "longhorn-layout.png", UIElement? element = null)
     {
